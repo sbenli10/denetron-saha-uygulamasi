@@ -1,0 +1,62 @@
+{
+  "open_users": {
+    "label": "Kullanıcı Yönetimi - Üyeler",
+    "keywords": [
+      "kullanıcılar",
+      "kullanıcı",
+      "users",
+      "user list",
+      "utilisateurs",
+      "usuarios",
+      "mitarbeiter",
+      "üyeler",
+      "personel"
+    ],
+    "path": "/admin/users"
+  },
+
+  "open_tasks": {
+    "label": "Görev Atama",
+    "keywords": [
+      "görevler",
+      "görev atama",
+      "assign task",
+      "tasks",
+      "mission",
+      "tareas",
+      "mandato"
+    ],
+    "path": "/admin/tasks"
+  },
+
+  "open_settings": {
+    "label": "Ayarlar",
+    "keywords": [
+      "ayarlar",
+      "settings",
+      "config",
+      "preferences"
+    ],
+    "path": "/admin/settings"
+  },
+
+  "open_notifications": {
+    "label": "Bildirimler",
+    "keywords": [
+      "bildirimler",
+      "notifications",
+      "alerts",
+      "uyarılar"
+    ]
+  },
+
+  "logout": {
+    "label": "Çıkış Yap",
+    "keywords": [
+      "çıkış",
+      "logout",
+      "sign out",
+      "log out"
+    ]
+  }
+}

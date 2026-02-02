@@ -1,0 +1,23 @@
+:root {
+  --background: #06070B;
+  --foreground: #FFFFFF;
+
+  --card: rgba(255,255,255,0.04);
+  --border: rgba(255,255,255,0.10);
+
+  --primary: #7C6DFE;
+  --primary-foreground: #FFFFFF;
+
+  --accent: #00C4B4;
+  --accent-foreground: #FFFFFF;
+
+  --sidebar: #0B0C11;
+  --sidebar-foreground: #E3E6F0;
+
+  --topbar: rgba(255,255,255,0.03);
+
+  --glow-color: rgba(124,109,254,0.35);
+
+  --text-primary: #FFFFFF;
+  --text-secondary: #A0A7B8;
+}

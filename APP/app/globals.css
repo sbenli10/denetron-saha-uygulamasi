@@ -1,0 +1,230 @@
+@import "./premium-theme.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =============================================================================
+   GLOBAL RESET + PRESET 1 AURA
+============================================================================== */
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--background);
+  color: var(--foreground);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Soft transitions */
+* {
+  transition:
+    background-color 0.22s ease,
+    color 0.22s ease,
+    border-color 0.22s ease;
+}
+
+/* =============================================================================
+   Premium Shadows / Surface Styles
+============================================================================== */
+
+.shadow-soft {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+}
+
+.surface-glass {
+  @apply bg-white/10 border border-white/20 backdrop-blur-xl shadow-xl rounded-2xl;
+}
+
+/* =============================================================================
+   Apple-like scrollbars
+============================================================================== */
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.22);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.35);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* =============================================================================
+   Fade animations
+============================================================================== */
+
+.fade-in {
+  animation: fadeIn 0.35s ease-out forwards;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+}
+
+/* =============================================================================
+   Base ShadCN Reset Fix
+============================================================================== */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* =============================================================================
+   Chart Color Scales (Preset 1)
+============================================================================== */
+/* SafetyCulture Indigo Chart Palette */
+.color-empty { fill: #cbd5e1 !important; }
+.color-scale-1 { fill: #6366f1 !important; }  /* indigo-500 */
+.color-scale-2 { fill: #818cf8 !important; }  /* indigo-400 */
+.color-scale-3 { fill: #a5b4fc !important; }  /* indigo-300 */
+.color-scale-4 { fill: #c7d2fe !important; }  /* indigo-200 */
+
+@keyframes goldFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes goldShimmer {
+  0% { opacity: 0.25; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.15); }
+  100% { opacity: 0.25; transform: scale(1); }
+}
+
+/* ⭐ Pulse Aura – premium kullanıcı nefes alan ışık efekti */
+@keyframes pulseAura {
+  0% { transform: scale(0.95); opacity: 0.45; }
+  50% { transform: scale(1.15); opacity: 0.75; }
+  100% { transform: scale(0.95); opacity: 0.45; }
+}
+
+/* MATERIAL RIPPLE EFFECT */
+.ripple-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-container .ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  background: rgba(0,0,0,0.12);
+  animation: ripple-animation 500ms linear;
+}
+
+@keyframes ripple-animation {
+  to {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+/* =========================
+   GRADIENT SKINS
+========================= */
+
+.gradient-skin-azure .sidebar-item-active {
+  background: linear-gradient(135deg, #4f8cff 0%, #70b5ff 100%);
+  color: white !important;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.gradient-skin-azure .sidebar-hover {
+  background: rgba(79, 140, 255, 0.12);
+  color: #2b65d9;
+}
+
+.gradient-skin-azure .sidebar-icon-active {
+  background: white !important;
+  color: #2b65d9 !important;
+}
+
+.gradient-skin-gold .sidebar-item-active {
+  background: linear-gradient(135deg, #d4af37 0%, #f5d76e 100%);
+  color: black !important;
+}
+
+.gradient-skin-gold .sidebar-hover {
+  background: rgba(212, 175, 55, 0.12);
+  color: #8a6d1f;
+}
+
+.gradient-skin-gold .sidebar-icon-active {
+  background: #fffbe6 !important;
+  color: #8a6d1f !important;
+}
+/* ===========================================================
+   APPLE SOFT RIPPLE EFFECT
+   =========================================================== */
+
+.soft-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.soft-ripple-circle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(5px);
+  transform: scale(0);
+  opacity: 0.8;
+  animation: softRippleAnim 480ms ease-out forwards;
+}
+
+@keyframes softRippleAnim {
+  0% {
+    transform: scale(0);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.8);
+    opacity: 0.25;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+@keyframes sheetUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.animate-sheetUp {
+  animation: sheetUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-shake {
+  animation: shake 0.35s;
+}
+
