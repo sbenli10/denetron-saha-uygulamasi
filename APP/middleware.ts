@@ -1,41 +1,56 @@
 // APP/middleware.ts
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next();
 
-  const publicRoutes = [
-    "/login",
-    "/register",
-    "/invite",
-    "/api/login",
-    "/api/register",
-  ];
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name) {
+          return req.cookies.get(name)?.value;
+        },
+        set(name, value, options) {
+          res.cookies.set({ name, value, ...options });
+        },
+        remove(name, options) {
+          res.cookies.set({ name, value: "", ...options });
+        },
+      },
+    }
+  );
 
-  if (publicRoutes.some(p => pathname.startsWith(p))) {
-    return NextResponse.next();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const pathname = req.nextUrl.pathname;
+
+  // Public routes
+  if (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/invite") ||
+    pathname.startsWith("/api/login") ||
+    pathname.startsWith("/api/register")
+  ) {
+    return res;
   }
 
-  // ✅ Supabase v2 refresh token kontrolü
-  const hasSession = req.cookies
-    .getAll()
-    .some(c =>
-      c.name.startsWith("sb-") &&
-      c.name.endsWith("-refresh-token")
-    );
-
-  if (!hasSession) {
+  // Auth required
+  if (!session) {
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  return res;
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
