@@ -3,13 +3,24 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+/**
+ * Build-safe Supabase client
+ * (lazy init – sadece request geldiğinde çalışır)
+ */
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceKey) {
+    throw new Error("Supabase environment variables are missing");
+  }
+
+  return createClient(url, serviceKey);
+}
 
 export async function POST(req: Request) {
   try {
+    const supabase = getSupabase();
     const body = await req.json();
 
     const {
@@ -32,12 +43,12 @@ export async function POST(req: Request) {
     const { error } = await supabase
       .from("dof_items")
       .update({
-        risk_description: risk_description?.trim(),
-        action_description: action_description?.trim() || null,
-        long_description: long_description?.trim() || null,
-        severity: severity?.trim() || null,
-        deadline: deadline?.trim() || null,
-        area: area?.trim() || null,
+        risk_description: risk_description?.trim() ?? null,
+        action_description: action_description?.trim() ?? null,
+        long_description: long_description?.trim() ?? null,
+        severity: severity?.trim() ?? null,
+        deadline: deadline?.trim() ?? null,
+        area: area?.trim() ?? null,
       })
       .eq("id", item_id);
 
