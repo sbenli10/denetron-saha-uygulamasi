@@ -1,4 +1,3 @@
-//APP\app\components\providers\AppProvider.tsx
 "use client";
 
 import {
@@ -8,12 +7,9 @@ import {
   useState,
   ReactNode,
 } from "react";
-
 import { supabaseAuth } from "@/lib/supabase/auth";
 
-/* =====================================================================
-   TYPES
-===================================================================== */
+/* ===================== TYPES ===================== */
 
 export interface Profile {
   id: string;
@@ -52,66 +48,54 @@ export interface AppContextState {
   loading: boolean;
 }
 
-/* =====================================================================
-   CONTEXT
-===================================================================== */
+/* ===================== CONTEXT ===================== */
 
 export const AppContext = createContext<AppContextState | null>(null);
 
-/* =====================================================================
-   PROVIDER
-===================================================================== */
+/* ===================== PROVIDER ===================== */
 
-export function AppProvider({
-  children,
-  initialUser,
-}: {
-  children: ReactNode;
-  initialUser: any;
-}) {
-
+export function AppProvider({ children }: { children: ReactNode }) {
   const supabase = supabaseAuth();
 
-  const [user, setUser] = useState<any>(initialUser);
+  const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [member, setMember] = useState<Member | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [orgSettings, setOrgSettings] = useState<OrgSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
+  /* ---------- INITIAL AUTH ---------- */
+  useEffect(() => {
+    let active = true;
 
-  /* =====================================================================
-   1) AUTH STATE LISTENER (LOGIN / LOGOUT / REFRESH)
-===================================================================== */
+    supabase.auth.getUser().then(({ data }) => {
+      if (!active) return;
+      setUser(data.user ?? null);
+    });
 
-    useEffect(() => {
+    return () => {
+      active = false;
+    };
+  }, [supabase]);
+
+  /* ---------- AUTH LISTENER ---------- */
+  useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (_event, session) => {
         setUser(session?.user ?? null);
-
         setProfile(null);
         setMember(null);
         setOrganization(null);
         setOrgSettings(null);
-
-        if (event !== "TOKEN_REFRESHED") {
-          setLoading(false);
-        }
       }
     );
 
     return () => {
-      listener.subscription?.unsubscribe();
+      listener.subscription.unsubscribe();
     };
   }, [supabase]);
 
-
-
-
-  /* =====================================================================
-      2) LOAD PROFILE + MEMBER + ORGANIZATION + ORG SETTINGS
-  ===================================================================== */
-
+  /* ---------- LOAD APP DATA ---------- */
   useEffect(() => {
     if (!user) {
       setProfile(null);
@@ -122,72 +106,48 @@ export function AppProvider({
       return;
     }
 
-
-
     let active = true;
 
     const loadData = async () => {
       setLoading(true);
 
-      /* -----------------------------
-         PROFILE
-      ------------------------------ */
       const { data: pRaw } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
-        .maybeSingle();
+        .maybeSingle<Profile>();
 
       if (!active) return;
-      setProfile(pRaw ? (pRaw as Profile) : null);
+      setProfile(pRaw ?? null);
 
-      /* -----------------------------
-         MEMBER
-      ------------------------------ */
       const { data: mRaw } = await supabase
         .from("org_members")
         .select("*")
         .eq("user_id", user.id)
         .is("deleted_at", null)
-        .maybeSingle();
+        .maybeSingle<Member>();
 
       if (!active) return;
-      const m = mRaw ? (mRaw as Member) : null;
-      setMember(m);
+      setMember(mRaw ?? null);
 
-      /* -----------------------------
-         ORGANIZATION + SETTINGS
-      ------------------------------ */
-      if (m?.org_id) {
+      if (mRaw?.org_id) {
         const { data: orgRaw } = await supabase
           .from("organizations")
           .select("*")
-          .eq("id", m.org_id)
-          .maybeSingle();
+          .eq("id", mRaw.org_id)
+          .maybeSingle<Organization>();
 
         if (!active) return;
-        setOrganization(orgRaw ? (orgRaw as Organization) : null);
+        setOrganization(orgRaw ?? null);
 
-        // 👇 LOGO BURADAN GELİYOR (PDF ROUTE İLE AYNI)
         const { data: settingsRaw } = await supabase
-        .from("org_settings")
-        .select("org_id, logo_url")
-        .eq("org_id", m.org_id)
-        .maybeSingle<OrgSettings>();
+          .from("org_settings")
+          .select("org_id, logo_url")
+          .eq("org_id", mRaw.org_id)
+          .maybeSingle<OrgSettings>();
 
-      console.log("[ORG_SETTINGS RAW]", settingsRaw);
-
-      if (!active) return;
-
-      setOrgSettings(
-        settingsRaw
-          ? {
-              org_id: settingsRaw.org_id,
-              logo_url: settingsRaw.logo_url ?? null,
-            }
-          : null
-      );
-
+        if (!active) return;
+        setOrgSettings(settingsRaw ?? null);
       } else {
         setOrganization(null);
         setOrgSettings(null);
@@ -203,10 +163,7 @@ export function AppProvider({
     };
   }, [user, supabase]);
 
-  /* =====================================================================
-      PROVIDER
-  ===================================================================== */
-
+  /* ---------- PROVIDER ---------- */
   return (
     <AppContext.Provider
       value={{
@@ -224,10 +181,12 @@ export function AppProvider({
   );
 }
 
-/* =====================================================================
-   HELPER HOOK
-===================================================================== */
+/* ===================== HOOK ===================== */
 
 export function useAppContext() {
-  return useContext(AppContext);
+  const ctx = useContext(AppContext);
+  if (!ctx) {
+    throw new Error("useAppContext must be used inside AppProvider");
+  }
+  return ctx;
 }
