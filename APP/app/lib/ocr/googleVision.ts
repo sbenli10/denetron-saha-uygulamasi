@@ -11,10 +11,32 @@ let client: ImageAnnotatorClient | null = null;
  * Lazy init – sadece ilk OCR çağrısında client oluşturulur
  */
 function getClient(): ImageAnnotatorClient {
-  if (!client) {
-    console.log("[OCR][INIT] googleVision client initialized");
-    client = new ImageAnnotatorClient();
+  if (client) return client;
+
+  console.log("[OCR][INIT] googleVision client initialized");
+
+  const base64 = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64;
+
+  if (!base64) {
+    throw new Error(
+      "GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 env variable is missing"
+    );
   }
+
+  let credentials: any;
+
+  try {
+    const json = Buffer.from(base64, "base64").toString("utf-8");
+    credentials = JSON.parse(json);
+  } catch (err) {
+    console.error("[OCR][INIT] Failed to decode service account JSON", err);
+    throw new Error("Invalid GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 value");
+  }
+
+  client = new ImageAnnotatorClient({
+    credentials,
+  });
+
   return client;
 }
 
@@ -36,7 +58,6 @@ export async function runOCR(
   const annotation = res.fullTextAnnotation;
 
   const text = annotation?.text ?? "";
-
   const confidences: number[] = [];
 
   for (const page of annotation?.pages ?? []) {
