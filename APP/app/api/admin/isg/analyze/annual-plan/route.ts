@@ -1,4 +1,6 @@
 // APP/app/api/admin/isg/analyze/annual-plan/route.ts
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { supabaseServerClient } from "@/lib/supabase/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -18,7 +20,6 @@ type ExtractedDoc = {
   };
 };
 
-export const runtime = "nodejs";
 
 /* ================================================================== */
 /* LOG HELPERS                                                         */
