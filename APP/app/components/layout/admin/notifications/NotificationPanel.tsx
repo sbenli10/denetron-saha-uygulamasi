@@ -1,94 +1,164 @@
 "use client";
 
+import { createPortal } from "react-dom";
+import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { CheckCheck, X } from "lucide-react";
+
 import { useNotifications } from "./NotificationProvider";
 import NotificationItem from "./NotificationItem";
-import { CheckCheck } from "lucide-react";
 import { useAccentColor } from "./useAccentColor";
 
-export default function NotificationPanel() {
+export default function NotificationPanel({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
   const { notifications, unread, markAllAsRead } = useNotifications();
   const accent = useAccentColor();
 
-  return (
-    <div
-      role="dialog"
-      aria-label="Bildirim paneli"
-      style={{ ["--accent" as any]: accent }}
-      className="
-        fixed inset-x-0 bottom-0 z-[999]
-        sm:absolute sm:right-0 sm:top-full sm:mt-2 sm:inset-auto
-        w-full sm:w-[420px]
-        max-h-[90vh] sm:max-h-[460px]
-        rounded-t-2xl sm:rounded-2xl
-        bg-neutral-900/80
-        backdrop-blur-2xl
-        border border-white/10
-        shadow-[0_20px_60px_-20px_rgba(0,0,0,0.9)]
-        overflow-hidden
-        animate-in fade-in slide-in-from-bottom-6 sm:zoom-in
-      "
-    >
-      {/* ===== Mobile drag handle ===== */}
-      <div className="sm:hidden flex justify-center py-2">
-        <div className="h-1.5 w-10 rounded-full bg-white/20" />
-      </div>
+  const [mounted, setMounted] = useState(false);
+  const startY = useRef<number | null>(null);
 
-      {/* ===== macOS window chrome (desktop only) ===== */}
-      <div className="hidden sm:flex items-center gap-2 px-4 pt-3">
-        <span className="h-3 w-3 rounded-full bg-red-500/90" />
-        <span className="h-3 w-3 rounded-full bg-yellow-400/90" />
-        <span className="h-3 w-3 rounded-full bg-green-500/90" />
-      </div>
+  /* ===================== MOUNT ===================== */
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
 
-      {/* ===== Header ===== */}
-      <div className="px-4 py-3 border-b border-white/10">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-white">
-              Bildirimler
+  /* ===================== ESC + BACK ===================== */
+  useEffect(() => {
+    if (!open) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+
+    const onPopState = () => onClose();
+
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("popstate", onPopState);
+
+    history.pushState({ modal: true }, "");
+
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, [open, onClose]);
+
+  /* ===================== SWIPE DOWN ===================== */
+  const onTouchStart = (e: React.TouchEvent) => {
+    startY.current = e.touches[0].clientY;
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (startY.current === null) return;
+    const delta = e.touches[0].clientY - startY.current;
+    if (delta > 120) {
+      startY.current = null;
+      onClose();
+    }
+  };
+
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* ===== BACKDROP (tap to close) ===== */}
+          <motion.div
+            onClick={onClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-sm"
+          />
+
+          {/* ===== PANEL ===== */}
+          <motion.div
+            role="dialog"
+            aria-label="Bildirim paneli"
+            style={{
+              ["--accent" as any]: accent,
+              paddingBottom: "env(safe-area-inset-bottom)",
+            }}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 26, stiffness: 260 }}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            className="
+              fixed inset-x-0 bottom-0 z-[9999]
+              sm:inset-auto sm:right-4 sm:top-16
+              w-full sm:w-[420px]
+              max-h-[90vh] sm:max-h-[460px]
+              rounded-t-3xl sm:rounded-2xl
+              bg-neutral-900/90
+              backdrop-blur-2xl
+              border border-white/10
+              shadow-[0_30px_80px_-25px_rgba(0,0,0,0.9)]
+              overflow-hidden
+            "
+          >
+            {/* ===== Drag Handle (mobile) ===== */}
+            <div className="sm:hidden flex justify-center py-2">
+              <div className="h-1.5 w-12 rounded-full bg-white/20" />
             </div>
-            <div className="text-xs text-white/60">
-              {unread > 0 ? `${unread} okunmamış` : "Tümü okundu"}
-            </div>
-          </div>
 
-          {unread > 0 && (
-            <button
-              onClick={markAllAsRead}
-              className="
-                inline-flex items-center gap-1.5
-                rounded-lg px-3 py-1.5
-                text-xs font-medium
-                text-[color:var(--accent)]
-                bg-white/5 hover:bg-white/10
-                transition
-                whitespace-nowrap
-              "
-            >
-              <CheckCheck size={14} />
-              Okundu Yap
-            </button>
-          )}
-        </div>
-      </div>
+            {/* ===== Header ===== */}
+            <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold text-white">
+                  Bildirimler
+                </div>
+                <div className="text-xs text-white/60">
+                  {unread > 0 ? `${unread} okunmamış` : "Tümü okundu"}
+                </div>
+              </div>
 
-      {/* ===== Content ===== */}
-      <div className="overflow-y-auto px-3 py-3 max-h-[calc(90vh-110px)] sm:max-h-[380px]">
-        <div className="space-y-2">
-          {notifications.length === 0 ? (
-            <div className="py-12 text-center text-sm text-white/50">
-              Bildirim bulunmuyor
+              <div className="flex items-center gap-2">
+                {unread > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    className="
+                      text-xs px-3 py-1.5 rounded-lg
+                      text-[color:var(--accent)]
+                      bg-white/5 hover:bg-white/10
+                      transition
+                    "
+                  >
+                    <CheckCheck size={14} />
+                  </button>
+                )}
+
+                <button
+                  onClick={onClose}
+                  className="p-1.5 rounded-lg hover:bg-white/10"
+                >
+                  <X size={16} className="text-white/70" />
+                </button>
+              </div>
             </div>
-          ) : (
-            notifications.map((n) => (
-              <NotificationItem
-                key={n.id}
-                notification={n}
-              />
-            ))
-          )}
-        </div>
-      </div>
-    </div>
+
+            {/* ===== Content ===== */}
+            <div className="overflow-y-auto px-3 py-3 max-h-[calc(90vh-110px)]">
+              {notifications.length === 0 ? (
+                <div className="py-12 text-center text-sm text-white/50">
+                  Bildirim bulunmuyor
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {notifications.map((n) => (
+                    <NotificationItem key={n.id} notification={n} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body
   );
 }
