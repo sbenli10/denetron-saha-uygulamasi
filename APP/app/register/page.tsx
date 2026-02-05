@@ -1,62 +1,71 @@
-//APP\app\register\page.tsx
 "use client";
 
-// HYPER-PREMIUM REGISTER PAGE v2 — FULL NEXT-GEN VERSION
-
 import { useState, useEffect, useRef } from "react";
-import { Loader2, CheckCircle } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+} from "lucide-react";
 import Link from "next/link";
 import clsx from "clsx";
 import ShaderBlur from "./components/ShaderBlur";
 
-
-/******************************** INPUT ********************************/
-function Input({ label, ...props }: any) {
+/* ================= INPUT ================= */
+function Input({ label, hint, ...props }: any) {
   return (
-    <div>
-      <label className="text-sm font-medium text-gray-200">{label}</label>
+    <div className="space-y-1">
+      <label className="text-xs uppercase tracking-wide text-white/60">
+        {label}
+      </label>
       <input
         {...props}
-        className="w-full mt-1 px-4 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-blue-500 outline-none"
+        className="
+          w-full px-4 py-3 rounded-xl
+          bg-white/10 text-white placeholder-white/40
+          border border-white/15
+          focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40
+          outline-none transition
+        "
       />
+      {hint && <p className="text-[11px] text-white/40">{hint}</p>}
     </div>
   );
 }
 
-/******************************** 3D BACKGROUND ********************************/
+/* ================= BACKGROUND ================= */
 function ThreeBackground() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const ref = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
-
+    if (!ref.current) return;
     import("three").then((THREE) => {
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(
-        65,
+        70,
         window.innerWidth / window.innerHeight,
         0.1,
         1000
       );
-
       const renderer = new THREE.WebGLRenderer({
-        canvas: canvasRef.current!,
+        canvas: ref.current!,
         alpha: true,
       });
 
-      renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
 
-      const geo = new THREE.TorusKnotGeometry(3, 1, 200, 30);
+      const geo = new THREE.TorusKnotGeometry(3, 1, 180, 32);
       const mat = new THREE.MeshStandardMaterial({
-        color: 0x2463eb,
+        color: 0x3b82f6,
         wireframe: true,
       });
-      const mesh = new THREE.Mesh(geo, mat);
 
+      const mesh = new THREE.Mesh(geo, mat);
       scene.add(mesh);
 
-      const light = new THREE.PointLight(0x4f9cff, 2, 50);
+      const light = new THREE.PointLight(0x60a5fa, 2, 50);
       light.position.set(10, 10, 10);
       scene.add(light);
 
@@ -64,62 +73,63 @@ function ThreeBackground() {
 
       const animate = () => {
         requestAnimationFrame(animate);
-        mesh.rotation.x += 0.003;
-        mesh.rotation.y += 0.004;
+        mesh.rotation.x += 0.002;
+        mesh.rotation.y += 0.003;
         renderer.render(scene, camera);
       };
-
       animate();
     });
   }, []);
 
   return (
-    <canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-30" />
+    <canvas
+      ref={ref}
+      className="absolute inset-0 w-full h-full opacity-25"
+    />
   );
 }
 
-
-
-/******************************** AI VOICE ********************************/
-function VoiceWizard() {
-  useEffect(() => {
-    const u = new SpeechSynthesisUtterance(
-      "Denetron kayıt ekranına hoş geldiniz. Lütfen bilgilerinizi giriniz."
-    );
-    u.rate = 1;
-    u.pitch = 1;
-    setTimeout(() => window.speechSynthesis.speak(u), 1200);
-  }, []);
-  return null;
-}
-
-/******************************** SUCCESS MODAL ********************************/
+/* ================= SUCCESS ================= */
 function SuccessModal({ show }: { show: boolean }) {
   if (!show) return null;
-
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur z-50 animate-fadeIn">
-      <div className="bg-white p-8 rounded-2xl shadow-2xl text-center animate-scaleIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl">
+      <div className="bg-white rounded-2xl p-8 text-center shadow-2xl">
         <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold mb-2">Kayıt Başarılı!</h2>
-        <p className="text-gray-700 mb-4">Giriş sayfasına yönlendiriliyorsunuz...</p>
+        <h2 className="text-2xl font-bold">Kayıt Tamamlandı</h2>
+        <p className="text-gray-600 mt-2">
+          Güvenli giriş sayfasına yönlendiriliyorsunuz…
+        </p>
       </div>
     </div>
   );
 }
 
-/******************************** MAIN PAGE ********************************/
+/* ================= PAGE ================= */
 export default function RegisterPage() {
   const [fullName, setFullName] = useState("");
   const [orgName, setOrgName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const getPasswordStrength = (pass: string) => {
+  let score = 0;
 
-  /******************************** FIXED REGISTER HANDLER ********************************/
+  if (pass.length >= 6) score++;
+  if (/[A-Z]/.test(pass)) score++;
+  if (/[0-9]/.test(pass)) score++;
+  if (/[^A-Za-z0-9]/.test(pass)) score++;
+
+  if (score <= 1) return { level: "Zayıf", color: "bg-red-500", value: 25 };
+  if (score === 2) return { level: "Orta", color: "bg-yellow-500", value: 50 };
+  if (score === 3) return { level: "İyi", color: "bg-blue-500", value: 75 };
+  return { level: "Güçlü", color: "bg-green-500", value: 100 };
+};
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -129,106 +139,140 @@ export default function RegisterPage() {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName,
-          orgName,
-          email,
-          password,
-        }),
+        body: JSON.stringify({ fullName, orgName, email, password }),
       });
 
       const out = await res.json();
-
       if (!res.ok) {
-        setError(out.error || "Kayıt hatası oluştu.");
+        setError(out.error || "Kayıt başarısız.");
         setLoading(false);
         return;
       }
 
       setSuccess(true);
-      setLoading(false);
-
-      setTimeout(() => {
-        window.location.href = "/login";
-      }, 2000);
-    } catch (err: any) {
-      console.error("Register Error:", err);
+      setTimeout(() => (window.location.href = "/login"), 2000);
+    } catch {
       setError("Sunucu hatası oluştu.");
       setLoading(false);
     }
   };
 
-  /******************************** RENDER ********************************/
   return (
-    <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden bg-[#020617] text-white p-6">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-[#020617] text-white px-6">
       <ThreeBackground />
       <ShaderBlur />
-      <VoiceWizard />
       <SuccessModal show={success} />
 
-      <div className="w-full max-w-md backdrop-blur-2xl bg-white/10 p-10 rounded-3xl shadow-2xl border border-white/10 relative z-20">
-        <h1 className="text-4xl font-bold text-center">DENETRON</h1>
-        <p className="text-center text-gray-300 mt-2">
-          Yeni hesap ve organizasyon oluştur
-        </p>
+      <div className="relative z-20 w-full max-w-md">
+        <div className="p-[1.5px] rounded-3xl bg-gradient-to-br from-blue-500/50 via-cyan-400/20 to-transparent">
+          <div className="rounded-3xl bg-black/65 backdrop-blur-2xl border border-white/10 p-10">
 
-        <form onSubmit={handleRegister} className="mt-8 space-y-5">
-          <Input
-            label="Ad Soyad"
-            value={fullName}
-            onChange={(e: any) => setFullName(e.target.value)}
-            required
-          />
-          <Input
-            label="Organizasyon Adı"
-            value={orgName}
-            onChange={(e: any) => setOrgName(e.target.value)}
-            required
-          />
-          <Input
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e: any) => setEmail(e.target.value)}
-            required
-          />
-          <Input
-            label="Şifre"
-            type="password"
-            value={password}
-            onChange={(e: any) => setPassword(e.target.value)}
-            required
-            minLength={6}
-          />
+            {/* HEADER */}
+            <header className="text-center mb-8">
+              <h1 className="text-3xl font-semibold tracking-wide">
+                DENETRON
+              </h1>
+              <p className="text-sm text-white/60 mt-1">
+                Yeni organizasyon ve yönetici hesabı oluştur
+              </p>
+            </header>
 
-          {error && (
-            <div className="text-red-400 text-sm text-center">{error}</div>
-          )}
+            {/* FORM */}
+            <form onSubmit={handleRegister} className="space-y-5">
+              <Input
+                label="Ad Soyad"
+                value={fullName}
+                onChange={(e: any) => setFullName(e.target.value)}
+                required
+              />
+              <Input
+                label="Firma Adı"
+                hint="Bu ad denetim ve raporlarda görünecektir"
+                value={orgName}
+                onChange={(e: any) => setOrgName(e.target.value)}
+                required
+              />
+              <Input
+                label="Email"
+                type="email"
+                value={email}
+                onChange={(e: any) => setEmail(e.target.value)}
+                required
+              />
 
-          <button
-            type="submit"
-            className={clsx(
-              "w-full py-3 rounded-lg font-semibold text-white transition-all",
-              loading
-                ? "bg-blue-400"
-                : "bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-blue-600/30"
-            )}
-            disabled={loading}
-          >
-            {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-            ) : (
-              "Kayıt Ol"
-            )}
-          </button>
-        </form>
+             {/* PASSWORD */}
+              <div className="relative space-y-2">
+                <Input
+                  label="Şifre"
+                  type={showPass ? "text" : "password"}
+                  hint="En az 6 karakter, tercihen rakam ve özel karakter"
+                  value={password}
+                  onChange={(e: any) => setPassword(e.target.value)}
+                  required
+                />
 
-        <p className="text-center text-gray-400 mt-6 text-sm">
-          Zaten hesabın var mı?{" "}
-          <Link href="/login" className="text-blue-400">
-            Giriş Yap
-          </Link>
-        </p>
+                {/* GÖSTER / GİZLE */}
+                <button
+                  type="button"
+                  onClick={() => setShowPass((v) => !v)}
+                  className="absolute right-3 top-[38px] text-white/50 hover:text-white transition"
+                >
+                  {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+
+                {/* ŞİFRE GÜCÜ */}
+                {password.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${getPasswordStrength(password).color}`}
+                        style={{ width: `${getPasswordStrength(password).value}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-white/50 text-right">
+                      Şifre Gücü:{" "}
+                      <span className="font-medium">
+                        {getPasswordStrength(password).level}
+                      </span>
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {error && (
+                <div className="text-red-400 text-sm text-center">
+                  {error}
+                </div>
+              )}
+
+              <button
+                disabled={loading}
+                className={clsx(
+                  "w-full py-3.5 rounded-xl font-semibold transition-all",
+                  loading
+                    ? "bg-blue-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-blue-600 to-blue-700 hover:-translate-y-0.5 hover:shadow-xl"
+                )}
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                ) : (
+                  "Organizasyonu Oluştur"
+                )}
+              </button>
+            </form>
+
+            {/* FOOTER */}
+            <footer className="mt-6 text-xs text-white/50 flex justify-between">
+              <span className="flex items-center gap-1">
+                <ShieldCheck size={14} /> ISO 45001 • KVKK
+              </span>
+              <Link href="/login" className="hover:underline">
+                Giriş Yap
+              </Link>
+            </footer>
+          </div>
+        </div>
       </div>
     </div>
   );

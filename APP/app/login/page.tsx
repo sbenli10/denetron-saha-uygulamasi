@@ -169,6 +169,40 @@ export default function LoginPage() {
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [rememberMe, setRememberMe] = useState(false);
   const [loginRole, setLoginRole] = useState<"operator" | "owner">("operator");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState(false);
+
+async function handleForgotPassword() {
+  if (!email) {
+    setError("Şifre sıfırlamak için email adresinizi giriniz.");
+    return;
+  }
+
+  setForgotLoading(true);
+  setError("");
+
+  try {
+    const res = await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+
+    const out = await res.json();
+
+    if (!res.ok) {
+      setError(out.error || "Şifre sıfırlama maili gönderilemedi.");
+      setForgotLoading(false);
+      return;
+    }
+
+    setForgotSuccess(true);
+  } catch {
+    setError("Sunucuya ulaşılamıyor.");
+  } finally {
+    setForgotLoading(false);
+  }
+}
 
 async function handleLogin(
   e: FormEvent<HTMLFormElement>,
@@ -210,7 +244,7 @@ async function handleLogin(
       description: "Oturum doğrulanıyor…",
     });
 
-    // 🔑 KRİTİK: session gerçekten oluşana kadar bekle
+        // 🔑 KRİTİK: session gerçekten oluşana kadar bekle
     let tries = 0;
     const interval = setInterval(async () => {
       const {
@@ -231,8 +265,7 @@ async function handleLogin(
     setError("Sunucuya ulaşılamıyor.");
   }
 }
-
- return (
+return (
   <div
     className="
       min-h-screen w-full
@@ -246,7 +279,7 @@ async function handleLogin(
     <div className="absolute inset-0 z-0">
       <ThreeGodRayBackground />
       <GPULiquid />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/60" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/70" />
     </div>
 
     {/* ================= THEME SWITCH ================= */}
@@ -256,7 +289,7 @@ async function handleLogin(
         absolute top-6 right-6 z-30
         px-4 py-2 rounded-xl
         bg-white/10 backdrop-blur-md
-        border border-white/15
+        border border-white/20
         text-sm font-medium
         hover:bg-white/20
         transition
@@ -267,21 +300,9 @@ async function handleLogin(
 
     {/* ================= AUTH CONTAINER ================= */}
     <div className="relative z-20 w-full max-w-md px-4">
-      <div
-        className="
-          p-[1.5px] rounded-3xl
-          bg-gradient-to-br from-blue-500/40 via-cyan-400/20 to-transparent
-          shadow-[0_40px_120px_rgba(0,120,255,0.35)]
-        "
-      >
-        <div
-          className="
-            relative rounded-3xl
-            bg-black/55 backdrop-blur-2xl
-            border border-white/10
-            p-10
-          "
-        >
+      <div className="p-[1.5px] rounded-3xl bg-gradient-to-br from-blue-500/50 via-cyan-400/20 to-transparent">
+        <div className="relative rounded-3xl bg-black/65 backdrop-blur-2xl border border-white/10 p-10">
+          
           {/* ================= HEADER ================= */}
           <header className="text-center mb-6">
             <h1 className="text-3xl font-semibold tracking-wide">
@@ -292,93 +313,51 @@ async function handleLogin(
             </p>
           </header>
 
-         {/* ================= ROLE SELECTOR ================= */}
-          <div
-            className="
-              mb-8
-              relative
-              flex
-              rounded-xl
-              bg-white/10
-              border border-white/10
-              p-1
-              backdrop-blur-md
-            "
-          >
-            {/* Active Indicator */}
+          {/* ================= ROLE SELECTOR ================= */}
+          <div className="mb-8 relative flex rounded-xl bg-white/10 border border-white/10 p-1 backdrop-blur-md">
             <div
               className={`
-                absolute top-1 bottom-1
-                w-1/2
-                rounded-lg
-                bg-white/90
-                shadow-[0_4px_20px_rgba(0,0,0,0.25)]
-                transition-all duration-200 ease-out
+                absolute top-1 bottom-1 w-1/2 rounded-lg
+                bg-white
+                shadow-lg
+                transition-all duration-200
                 ${loginRole === "operator" ? "left-1" : "left-1/2"}
               `}
             />
-
-            {/* Operator */}
             <button
               type="button"
               onClick={() => setLoginRole("operator")}
-              className={`
-                relative z-10
-                flex-1 py-2
-                text-sm font-medium
-                rounded-lg
-                transition-colors duration-200
-                ${
-                  loginRole === "operator"
-                    ? "text-black"
-                    : "text-white/70 hover:text-white"
-                }
+              className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg
+                ${loginRole === "operator" ? "text-black" : "text-white/70 hover:text-white"}
               `}
             >
               Operatör
             </button>
-
-            {/* Owner */}
             <button
               type="button"
               onClick={() => setLoginRole("owner")}
-              className={`
-                relative z-10
-                flex-1 py-2
-                text-sm font-medium
-                rounded-lg
-                transition-colors duration-200
-                ${
-                  loginRole === "owner"
-                    ? "text-black"
-                    : "text-white/70 hover:text-white"
-                }
+              className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg
+                ${loginRole === "owner" ? "text-black" : "text-white/70 hover:text-white"}
               `}
             >
               İş Güvenliği Uzmanı
             </button>
           </div>
 
-
           {/* ================= FORM ================= */}
-          <form
-            onSubmit={(e) => handleLogin(e, loginRole)}
-            className="space-y-6"
-          >
-            {/* ERROR */}
+          <form onSubmit={(e) => handleLogin(e, loginRole)} className="space-y-6">
+
             {error && (
               <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/30 px-4 py-3 rounded-xl">
                 <AlertTriangle size={18} />
-                <span>{error}</span>
+                {error}
               </div>
             )}
 
             {/* EMAIL */}
             <div className="space-y-1">
               <label className="text-xs uppercase tracking-wide text-white/60">
-                {loginRole === "operator"
-                  ? "Operatör Email"
-                  : "Yönetici Email"}
+                {loginRole === "operator" ? "Operatör Email" : "Yönetici Email"}
               </label>
               <Input
                 icon={Globe}
@@ -395,11 +374,12 @@ async function handleLogin(
               />
             </div>
 
+            {/* PASSWORD (GÖRÜNÜR) */}
             <div className="relative">
               <Input
                 type={showPassword ? "text" : "password"}
                 icon={Lock}
-                placeholder="••••••••"
+                placeholder="Şifre"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -408,6 +388,7 @@ async function handleLogin(
                 className="pr-12"
               />
 
+              {/* GİZLE / GÖSTER */}
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
@@ -416,23 +397,22 @@ async function handleLogin(
                   text-white/60 hover:text-white
                   transition
                 "
+                title={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
 
-
             {/* SUBMIT */}
             <button
               disabled={isRedirecting}
               className={`
-                w-full py-3.5 rounded-xl
-                text-sm font-semibold
+                w-full py-3.5 rounded-xl text-sm font-semibold
                 transition-all
                 ${
                   isRedirecting
                     ? "bg-blue-400 cursor-not-allowed"
-                    : "bg-gradient-to-r from-blue-600 to-blue-700 hover:shadow-[0_10px_40px_rgba(37,99,235,0.45)] hover:-translate-y-0.5"
+                    : "bg-gradient-to-r from-blue-600 to-blue-700 hover:-translate-y-0.5 hover:shadow-xl"
                 }
               `}
             >
@@ -451,11 +431,30 @@ async function handleLogin(
               Kayıt Ol
             </Link>
           </footer>
+          {/* ŞİFREMİ UNUTTUM */}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={forgotLoading}
+              className="
+                text-xs text-blue-400
+                hover:text-blue-300 hover:underline
+                transition disabled:opacity-50
+              "
+            >
+              {forgotLoading
+                ? "Mail gönderiliyor…"
+                : "Şifremi unuttum"}
+            </button>
+          </div>
+
+
 
           {/* ================= SESSION OVERLAY ================= */}
           {isVerifyingSession && (
             <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-xl rounded-3xl">
-              <div className="text-center text-white space-y-3">
+              <div className="text-center space-y-3">
                 <div className="animate-spin rounded-full h-10 w-10 border-2 border-white border-t-transparent mx-auto" />
                 <p className="text-sm opacity-80">
                   Oturum güvenliği doğrulanıyor…
