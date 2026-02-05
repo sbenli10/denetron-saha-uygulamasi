@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 // GPU fluid dışarı alındı
 import GPULiquid from "./components/GPULiquid";
+import { supabaseAuth } from "@/lib/supabase/auth";
 
 /******************************** THEMES ********************************/
 type ThemeMode = "light" | "dark";
@@ -25,6 +26,7 @@ const themes: Record<ThemeMode, { bg: string; text: string; card: string }> = {
     card: "rgba(12,18,32,0.7)",
   },
 };
+const supabase = supabaseAuth();
 
 
 /******************************** INPUT ********************************/
@@ -168,85 +170,67 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [loginRole, setLoginRole] = useState<"operator" | "owner">("operator");
 
-  async function handleLogin(
-    e: FormEvent<HTMLFormElement>,
-    loginRole: "operator" | "owner"
-  ) {
-    e.preventDefault();
-    setError("");
+async function handleLogin(
+  e: FormEvent<HTMLFormElement>,
+  loginRole: "operator" | "owner"
+) {
+  e.preventDefault();
+  setError("");
 
-    if (!email || !password) {
-      setError("Email ve şifre zorunludur.");
+  if (!email || !password) {
+    setError("Email ve şifre zorunludur.");
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        password,
+        rememberMe,
+        roleHint: loginRole,
+      }),
+    });
+
+    const out = await res.json();
+
+    if (!res.ok) {
+      setError(out.error || "Giriş başarısız");
       return;
     }
 
-    try {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          rememberMe,
-          roleHint: loginRole, // 🔑 kritik ek
-        }),
-      });
+    const role = out.role as "admin" | "operator";
 
-      const text = await res.text();
-      let out: any = {};
+    setIsRedirecting(true);
+    setIsVerifyingSession(true);
 
-      try {
-        out = JSON.parse(text);
-      } catch {
-        out = { error: "Email veya şifre hatalı" };
+    toast.success("Giriş başarılı", {
+      description: "Oturum doğrulanıyor…",
+    });
+
+    // 🔑 KRİTİK: session gerçekten oluşana kadar bekle
+    let tries = 0;
+    const interval = setInterval(async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session || tries > 10) {
+        clearInterval(interval);
+
+        router.replace(
+          role === "admin" ? "/admin/dashboard" : "/operator"
+        );
       }
 
-      if (!res.ok) {
-        const message =
-          out.error === "Invalid login credentials"
-            ? "Email veya şifre hatalı"
-            : out.error || "Giriş başarısız.";
-
-        setError(message);
-        return;
-      }
-
-      // ✅ BAŞARILI GİRİŞ
-      const role = out.role as "admin" | "operator";
-
-      setIsRedirecting(true);
-      setIsVerifyingSession(true);
-
-      toast.success(
-        role === "admin" ? "Yönetici girişi başarılı" : "Giriş başarılı",
-        {
-          description:
-            role === "admin"
-              ? "Yönetim paneline yönlendiriliyorsunuz"
-              : "Operatör paneline yönlendiriliyorsunuz",
-        }
-      );
-
-      setTimeout(() => {
-        setIsVerifyingSession(false);
-        router.push(role === "admin" ? "/admin/dashboard" : "/operator");
-      }, 1800);
-    } catch {
-      setError("Sunucuya ulaşılamıyor.");
-    }
+      tries++;
+    }, 300);
+  } catch {
+    setError("Sunucuya ulaşılamıyor.");
   }
-
-
-
-  function calculateStrength(pw: string) {
-    let score = 0;
-    if (pw.length >= 8) score++;
-    if (/[A-Z]/.test(pw)) score++;
-    if (/[0-9]/.test(pw)) score++;
-    if (/[^A-Za-z0-9]/.test(pw)) score++;
-    return score;
-  }
-
+}
 
  return (
   <div
@@ -411,12 +395,7 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* PASSWORD */}
-            <div className="space-y-2">
-              <label className="text-xs uppercase tracking-wide text-white/60">
-                Şifre
-              </label>
-
+            <div className="relative">
               <Input
                 type={showPassword ? "text" : "password"}
                 icon={Lock}
@@ -426,8 +405,22 @@ export default function LoginPage() {
                   setPassword(e.target.value);
                   setError("");
                 }}
+                className="pr-12"
               />
+
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="
+                  absolute right-3 top-1/2 -translate-y-1/2
+                  text-white/60 hover:text-white
+                  transition
+                "
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
+
 
             {/* SUBMIT */}
             <button
