@@ -29,51 +29,53 @@ export default function NotificationBell() {
       <button
         onClick={() => setOpen((v) => !v)}
         className="
-            group relative inline-flex h-9 w-9
-            items-center justify-center
-            rounded-full
-            bg-black/5 dark:bg-white/5
-            hover:bg-black/10 dark:hover:bg-white/10
-            transition
-            focus:outline-none
-            focus-visible:ring-2 focus-visible:ring-primary/30
+          group relative inline-flex h-9 w-9
+          items-center justify-center
+          rounded-full
+          bg-black/5 dark:bg-white/5
+          hover:bg-black/10 dark:hover:bg-white/10
+          transition
+          focus:outline-none
+          focus-visible:ring-2 focus-visible:ring-primary/30
         "
         aria-label="Bildirimler"
-        >
+      >
         <Bell
-            size={18}
-            className="
+          size={18}
+          className="
             text-muted-foreground
             group-hover:text-foreground
             transition
-            "
+          "
         />
 
         {unread > 0 && (
-            <span
+          <span
             className="
-                absolute -top-0.5 -right-0.5
-                flex h-4 min-w-[16px]
-                items-center justify-center
-                rounded-full px-1
-                text-[10px] font-semibold
-                text-white
-                bg-primary
+              absolute -top-0.5 -right-0.5
+              flex h-4 min-w-[16px]
+              items-center justify-center
+              rounded-full px-1
+              text-[10px] font-semibold
+              text-white
+              bg-primary
             "
-            >
+          >
             {unread > 9 ? "9+" : unread}
-            </span>
+          </span>
         )}
-        </button>
-
+      </button>
 
       {/* Panel */}
       {open && (
         <div
           style={{ ["--accent" as any]: accent }}
-          className="absolute right-0 top-full"
+          className="absolute right-0 top-full z-50"
         >
-          <NotificationPanel />
+          <NotificationPanel
+            open={open}
+            onClose={() => setOpen(false)}
+          />
         </div>
       )}
     </div>

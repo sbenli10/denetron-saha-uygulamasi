@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { useNotifications } from "./NotificationProvider";
+import { useNotifications, type NotificationItem } from "./NotificationProvider";
 import {
   Bell,
   Info,
@@ -9,46 +9,51 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-/* Relative time helper */
+/* ================= RELATIVE TIME ================= */
+
 function formatRelativeTime(date: string) {
   const diff = Date.now() - new Date(date).getTime();
   const min = Math.floor(diff / 60000);
 
   if (min < 1) return "şimdi";
   if (min < 60) return `${min} dk`;
+
   const h = Math.floor(min / 60);
   if (h < 24) return `${h} sa`;
+
   return `${Math.floor(h / 24)} gün`;
 }
 
-/* Title → icon mapping */
+/* ================= ICON MAPPING ================= */
+
 function getIcon(title: string) {
   const t = title.toLowerCase();
-  if (t.includes("başar") || t.includes("onay"))
-    return CheckCircle;
-  if (t.includes("uyarı") || t.includes("hata"))
-    return AlertTriangle;
-  if (t.includes("bilgi"))
-    return Info;
+
+  if (t.includes("başar") || t.includes("onay")) return CheckCircle;
+  if (t.includes("uyarı") || t.includes("hata")) return AlertTriangle;
+  if (t.includes("bilgi")) return Info;
+
   return Bell;
 }
+
+/* ================= COMPONENT ================= */
 
 export default function NotificationItem({
   notification,
 }: {
-  notification: {
-    id: number;
-    title: string;
-    message?: string | null;
-    created_at: string;
-    read: boolean;
-  };
+  notification: NotificationItem;
 }) {
   const { markAsRead } = useNotifications();
   const Icon = getIcon(notification.title);
 
-  /* Simple native swipe detection */
+  /* Swipe detection */
   const startX = useRef<number | null>(null);
+
+  function handleRead() {
+    if (!notification.read) {
+      markAsRead(notification.id);
+    }
+  }
 
   function onPointerDown(e: React.PointerEvent) {
     startX.current = e.clientX;
@@ -56,16 +61,21 @@ export default function NotificationItem({
 
   function onPointerUp(e: React.PointerEvent) {
     if (startX.current === null) return;
+
     const delta = e.clientX - startX.current;
+
+    // 👉 Swipe left / right → mark as read
     if (Math.abs(delta) > 60) {
-      markAsRead(notification.id);
+      handleRead();
     }
+
     startX.current = null;
   }
 
   return (
     <button
-      onClick={() => markAsRead(notification.id)}
+      type="button"
+      onClick={handleRead}
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       className="
@@ -111,6 +121,7 @@ export default function NotificationItem({
         {!notification.read && (
           <span className="h-2 w-2 rounded-full bg-[color:var(--accent)]" />
         )}
+
         <span className="text-[10px] text-white/40 whitespace-nowrap">
           {formatRelativeTime(notification.created_at)}
         </span>
