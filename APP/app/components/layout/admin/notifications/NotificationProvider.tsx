@@ -40,8 +40,8 @@ export function NotificationProvider({
   orgId,
 }: {
   children: React.ReactNode;
-  userId: string;
-  orgId: string;
+  userId?: string;   // ✅ ARTIK ZORUNLU DEĞİL
+  orgId?: string;    // ✅ ARTIK ZORUNLU DEĞİL
 }) {
   const supabase = supabaseClient();
 
@@ -59,6 +59,8 @@ export function NotificationProvider({
   /* ================= 1) INITIAL LOAD ================= */
 
   useEffect(() => {
+    if (!orgId) return; // ✅ EN KRİTİK SATIR
+
     async function load() {
       const { data } = await supabase
         .from("notifications")
@@ -76,6 +78,8 @@ export function NotificationProvider({
   /* ================= 2) REALTIME ================= */
 
   useEffect(() => {
+    if (!orgId) return; // ✅ BURASI DA Ş encourages
+
     const channel = supabase
       .channel("org-notifications")
       .on(
@@ -114,6 +118,8 @@ export function NotificationProvider({
   };
 
   const markAllAsRead = async () => {
+    if (!orgId) return;
+
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
 
     await supabase
@@ -143,12 +149,24 @@ export function NotificationProvider({
   );
 }
 
-/* ================= HOOK ================= */
+/* ================= HOOK (PROD-SAFE) ================= */
 
-export function useNotifications() {
+export function useNotifications(): Ctx {
   const ctx = useContext(NotificationContext);
+
+  // ✅ PROD’DA ASLA CRASH ETMEZ
   if (!ctx) {
-    throw new Error("useNotifications must be used inside NotificationProvider");
+    return {
+      notifications: [],
+      unread: 0,
+      isOpen: false,
+      open: () => {},
+      close: () => {},
+      toggle: () => {},
+      markAsRead: () => {},
+      markAllAsRead: () => {},
+    };
   }
+
   return ctx;
 }
