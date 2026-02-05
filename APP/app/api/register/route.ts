@@ -1,24 +1,39 @@
-// APP/app/api/register/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
+type RegisterBody = {
+  fullName: string;
+  orgName: string;
+  email: string;
+  password: string;
+};
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    /* -------------------------------------------------
+       0) BODY PARSE & BASIC VALIDATION
+    ------------------------------------------------- */
+    let body: RegisterBody;
+
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Geçersiz istek formatı." },
+        { status: 400 }
+      );
+    }
 
     const { fullName, orgName, email, password } = body;
 
-    /* -------------------------------------------------
-       1) VALIDATION
-    ------------------------------------------------- */
     if (!fullName || !orgName || !email || !password) {
       return NextResponse.json(
         {
-          error: "Lütfen tüm alanları doldurun.",
-          fieldErrors: {
+          error: "Zorunlu alanlar eksik.",
+          fields: {
             fullName: !fullName ? "Ad Soyad zorunludur." : undefined,
             orgName: !orgName ? "Firma adı zorunludur." : undefined,
-            email: !email ? "Email adresi zorunludur." : undefined,
+            email: !email ? "Email zorunludur." : undefined,
             password: !password ? "Şifre zorunludur." : undefined,
           },
         },
@@ -26,24 +41,70 @@ export async function POST(req: Request) {
       );
     }
 
+    if (password.length < 6) {
+      return NextResponse.json(
+        {
+          error: "Şifre çok kısa.",
+          hint: "Şifre en az 6 karakter olmalıdır.",
+        },
+        { status: 400 }
+      );
+    }
+
+    /* -------------------------------------------------
+       1) EXISTING PROFILE CHECK (BUSINESS RULE)
+       - Davetli mi?
+       - Başka org’a bağlı mı?
+    ------------------------------------------------- */
+    const { data: existingProfile, error: profileCheckError } =
+      await supabaseAdmin
+        .from("profiles")
+        .select("id, organization_id")
+        .eq("email", email)
+        .maybeSingle();
+
+    if (profileCheckError) {
+      return NextResponse.json(
+        {
+          error: "Kullanıcı kontrolü başarısız.",
+          hint: "Lütfen daha sonra tekrar deneyin.",
+        },
+        { status: 500 }
+      );
+    }
+
+    if (existingProfile?.organization_id) {
+      return NextResponse.json(
+        {
+          error: "Bu email zaten bir organizasyona bağlı.",
+          hint:
+            "Yeni organizasyon oluşturamazsınız. Lütfen giriş yapın veya davet bağlantısı kullanın.",
+        },
+        { status: 409 }
+      );
+    }
+
     /* -------------------------------------------------
        2) AUTH USER CREATE
     ------------------------------------------------- */
-    const { data: userRes, error: userErr } =
+    const { data: authRes, error: authError } =
       await supabaseAdmin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
-        user_metadata: { full_name: fullName },
+        user_metadata: {
+          full_name: fullName,
+        },
       });
 
-    if (userErr || !userRes?.user) {
-      // Kullanıcı zaten varsa
-      if (userErr?.message?.toLowerCase().includes("already")) {
+    if (authError || !authRes?.user) {
+      const msg = authError?.message?.toLowerCase() || "";
+
+      if (msg.includes("already")) {
         return NextResponse.json(
           {
             error: "Bu email adresi zaten kayıtlı.",
-            hint: "Lütfen giriş yapmayı deneyin.",
+            hint: "Giriş yapmayı deneyin veya şifrenizi sıfırlayın.",
           },
           { status: 409 }
         );
@@ -52,52 +113,56 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error: "Kullanıcı hesabı oluşturulamadı.",
-          detail: userErr?.message,
+          detail: authError?.message,
         },
         { status: 400 }
       );
     }
 
-    const user = userRes.user;
+    const user = authRes.user;
 
     /* -------------------------------------------------
        3) ORGANIZATION CREATE
     ------------------------------------------------- */
-    const baseSlug = orgName
+    const slugBase = orgName
       .toLowerCase()
+      .trim()
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9-]/g, "");
 
-    const slug = `${baseSlug}-${Date.now()}`;
+    const slug = `${slugBase}-${Date.now()}`;
 
     const { data: org, error: orgError } = await supabaseAdmin
       .from("organizations")
-      .insert({ name: orgName, slug })
+      .insert({
+        name: orgName,
+        slug,
+      })
       .select()
       .single();
 
     if (orgError || !org) {
       return NextResponse.json(
         {
-          error: "Firma oluşturulurken bir sorun oluştu.",
-          hint: "Lütfen firma adını kontrol edip tekrar deneyin.",
+          error: "Organizasyon oluşturulamadı.",
+          hint: "Firma adını kontrol edip tekrar deneyin.",
         },
         { status: 400 }
       );
     }
 
     /* -------------------------------------------------
-       4) PROFILE CREATE / UPDATE
+       4) PROFILE UPSERT (ADMIN)
     ------------------------------------------------- */
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
       .upsert(
         {
           id: user.id,
-          full_name: fullName,
-          organization_id: org.id,
-          role: "admin",
           email,
+          full_name: fullName,
+          role: "admin",
+          organization_id: org.id,
         },
         { onConflict: "id" }
       );
@@ -105,31 +170,32 @@ export async function POST(req: Request) {
     if (profileError) {
       return NextResponse.json(
         {
-          error: "Profil bilgileri oluşturulamadı.",
-          hint: "Lütfen tekrar deneyin veya destek ekibiyle iletişime geçin.",
+          error: "Profil oluşturulamadı.",
+          hint: "Lütfen destek ekibiyle iletişime geçin.",
         },
-        { status: 400 }
+        { status: 500 }
       );
     }
 
     /* -------------------------------------------------
-       5) ORG MEMBER CREATE
+       5) ORG MEMBER INSERT (ADMIN)
+       - UNIQUE (user_id, org_id) DB constraint önerilir
     ------------------------------------------------- */
     const { error: memberError } = await supabaseAdmin
       .from("org_members")
       .insert({
-        org_id: org.id,
         user_id: user.id,
+        org_id: org.id,
         role: "admin",
       });
 
     if (memberError) {
       return NextResponse.json(
         {
-          error: "Kullanıcı firmaya bağlanamadı.",
+          error: "Kullanıcı organizasyona bağlanamadı.",
           hint: "Lütfen tekrar deneyin.",
         },
-        { status: 400 }
+        { status: 500 }
       );
     }
 
@@ -139,17 +205,17 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         success: true,
-        message: "Kayıt başarıyla tamamlandı.",
+        message: "Organizasyon ve yönetici hesabı başarıyla oluşturuldu.",
         nextStep: "Giriş yapabilirsiniz.",
       },
       { status: 200 }
     );
-  } catch (e: any) {
-    console.error("REGISTER ERROR:", e);
+  } catch (err) {
+    console.error("REGISTER ROUTE ERROR:", err);
 
     return NextResponse.json(
       {
-        error: "Beklenmeyen bir sunucu hatası oluştu.",
+        error: "Beklenmeyen sunucu hatası.",
         hint: "Lütfen birkaç dakika sonra tekrar deneyin.",
       },
       { status: 500 }

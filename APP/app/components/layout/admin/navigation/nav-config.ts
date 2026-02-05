@@ -54,7 +54,7 @@ export const NAV_ITEMS: SidebarNavItem[] = [
         href: "/admin/tasks",
       },
       {
-        label: "🛠️ Kullanıcı Tanımlı DÖF’ler",
+        label: "🛠️ DÖF Oluştur",
         href: "/admin/dof/manual",
       },
       {

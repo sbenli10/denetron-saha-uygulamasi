@@ -2,7 +2,6 @@
 export const dynamic = "force-dynamic";
 
 import { getAdminContext } from "@/lib/admin/context";
-import ShellLayout from "@/components/layout/admin/shell/ShellLayout";
 import SettingsLayout from "./_components/SettingsLayout";
 import SettingsTabs, {
   SettingsTabKey,
@@ -72,13 +71,11 @@ export default async function SettingsPage({
   }
 
   return (
-    <ShellLayout>
       <SettingsLayout>
         <div className="space-y-8">
           <SettingsTabs isPremium={isPremium} />
           <div>{renderTabContent()}</div>
         </div>
       </SettingsLayout>
-    </ShellLayout>
   );
 }
