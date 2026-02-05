@@ -1,4 +1,4 @@
-//APP\app\components\layout\admin\navigation\Sidebar.tsx
+// APP/app/components/layout/admin/navigation/Sidebar.tsx
 "use client";
 
 import { X } from "lucide-react";
@@ -21,14 +21,16 @@ export default function Sidebar({
   const ctx = useAppContext();
   const { isPremium } = usePremium();
 
-  const user = ctx?.profile
+  /* ================= USER ================= */
+  const user = ctx?.profile && ctx?.user
     ? {
         name: ctx.profile.full_name ?? ctx.user.email ?? "Kullanıcı",
         email: ctx.user.email ?? "",
-        role: ctx.member?.role,
+        role: ctx.member?.role as "admin" | "manager" | undefined,
       }
     : null;
 
+  /* ================= ORG ================= */
   const org = ctx?.organization
     ? {
         name: ctx.organization.name,
@@ -37,11 +39,32 @@ export default function Sidebar({
       }
     : null;
 
-  const filtered: SidebarNavItem[] = NAV_ITEMS.filter(
-    (item) =>
-      item.roles.includes(user?.role ?? "") &&
-      (!item.premium || isPremium)
-  );
+  /* ================= NAV FILTER ================= */
+  const filteredNavItems: SidebarNavItem[] = NAV_ITEMS
+    // 🔐 ROLE + 💎 PREMIUM (parent)
+    .filter(
+      (item) =>
+        user?.role &&
+        item.roles.includes(user.role) &&
+        (!item.premium || isPremium)
+    )
+    // 🧹 CHILD PREMIUM FILTER
+    .map((item) => {
+      if (!item.children) return item;
+
+      const filteredChildren = item.children.filter(
+        (child) => !child.premium || isPremium
+      );
+
+      return {
+        ...item,
+        children: filteredChildren,
+      };
+    })
+    // 🚫 CHILD KALMADIYSA PARENT'I GİZLE
+    .filter(
+      (item) => !item.children || item.children.length > 0
+    );
 
   return (
     <div className="h-full w-full flex flex-col bg-white/95 backdrop-blur-xl border-r border-border">
@@ -49,14 +72,15 @@ export default function Sidebar({
       <div className="h-16 px-4 flex items-center justify-between border-b">
         <div className="font-semibold truncate">Denetron</div>
 
-        {/* ❗ SADECE MOBİL
+        {/* ❗ MOBİL KAPATMA (İstersen açabilirsin)
         <button
           onClick={closeMobile}
           className="lg:hidden h-8 w-8 flex items-center justify-center rounded-lg border"
           aria-label="Menüyü kapat"
         >
           <X size={18} />
-        </button> */}
+        </button>
+        */}
       </div>
 
       {/* ================= ORGANIZATION ================= */}
@@ -79,7 +103,9 @@ export default function Sidebar({
 
             {expanded && (
               <div className="min-w-0">
-                <div className="font-medium truncate">{org.name}</div>
+                <div className="font-medium truncate">
+                  {org.name}
+                </div>
                 {org.isPremium && <DenetronPremiumBadge />}
               </div>
             )}
@@ -89,7 +115,7 @@ export default function Sidebar({
 
       {/* ================= NAV ================= */}
       <nav className="flex-1 overflow-y-auto px-2 space-y-1">
-        {filtered.map((item) =>
+        {filteredNavItems.map((item) =>
           item.children ? (
             <SidebarSection
               key={item.label}
