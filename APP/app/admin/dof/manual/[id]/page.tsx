@@ -245,123 +245,122 @@ export default function ManualDofDetailPage() {
             >
 
               {/* HEADER */}
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">
-                  Madde {index + 1}
-                </h3>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="text-base sm:text-lg font-semibold">
+                    Madde {index + 1}
+                  </h3>
 
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`rounded px-2 py-1 text-xs ${statusMap[item.status]}`}
-                  >
-                    {item.status === "completed"
-                      ? "Tamamlandı"
-                      : item.status === "overdue"
-                      ? "Gecikmiş"
-                      : "Açık"}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded px-2 py-1 text-xs ${statusMap[item.status]}`}
+                    >
+                      {item.status === "completed"
+                        ? "Tamamlandı"
+                        : item.status === "overdue"
+                        ? "Gecikmiş"
+                        : "Açık"}
+                    </span>
 
-                  {!isReadOnly && (
-                    <>
-                      <button
-                        onClick={() => setEditItem(item)}
-                        className="rounded border px-3 py-1 text-xs hover:bg-gray-50"
-                      >
-                        Düzenle
-                      </button>
+                    {!isReadOnly && (
+                      <>
+                        <button
+                          onClick={() => setEditItem(item)}
+                          className="rounded border px-3 py-1 text-xs hover:bg-gray-50"
+                        >
+                          Düzenle
+                        </button>
 
-                      <button
-                        onClick={async () => {
-                          const ok = confirm(
-                            "Bu DÖF maddesini silmek istediğinize emin misiniz?"
-                          );
-                          if (!ok) return;
+                        <button
+                          onClick={async () => {
+                            const ok = confirm(
+                              "Bu DÖF maddesini silmek istediğinize emin misiniz?"
+                            );
+                            if (!ok) return;
 
-                          // 🔥 Optimistic update
-                          mutate(
-                            current => {
-                              if (!current) return current;
-                              return {
-                                ...current,
-                                dof: {
-                                  ...current.dof,
-                                  items: current.dof.items.filter(
-                                    i => i.id !== item.id
-                                  ),
-                                },
-                              };
-                            },
-                            false // revalidate ETME
-                          );
+                            mutate(
+                              current => {
+                                if (!current) return current;
+                                return {
+                                  ...current,
+                                  dof: {
+                                    ...current.dof,
+                                    items: current.dof.items.filter(
+                                      i => i.id !== item.id
+                                    ),
+                                  },
+                                };
+                              },
+                              false
+                            );
 
-                          const res = await fetch("/api/dof/manual/item-delete", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ item_id: item.id }),
-                          });
+                            const res = await fetch("/api/dof/manual/item-delete", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ item_id: item.id }),
+                            });
 
-                          if (!res.ok) {
-                            alert("Madde silinemedi, sayfa yenileniyor");
-                            mutate(); // geri al
-                            return;
-                          }
+                            if (!res.ok) {
+                              alert("Madde silinemedi, sayfa yenileniyor");
+                              mutate();
+                              return;
+                            }
 
-                          // backend ile sync
-                          mutate();
-                        }}
-                        className="rounded border border-red-200 px-3 py-1 text-xs text-red-600 hover:bg-red-50"
-                      >
-                        Sil
-                      </button>
-
-                    </>
-                  )}
+                            mutate();
+                          }}
+                          className="rounded border border-red-200 px-3 py-1 text-xs text-red-600 hover:bg-red-50"
+                        >
+                          Sil
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
+
 
               {/* META */}
-              <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
-                <div>
-                  <p className="text-gray-500">İlgili Bölüm</p>
-                  <p className="font-medium">{item.area || "—"}</p>
+                <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <p className="text-gray-500">İlgili Bölüm</p>
+                    <p className="font-medium">{item.area || "—"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-500">Termin</p>
+                    <p className="font-medium">
+                      {item.deadline && item.deadline.trim() !== ""
+                        ? item.deadline
+                        : "—"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-500 text-sm">Önem Seviyesi</p>
+
+                    {item.severity ? (
+                      <span
+                        className={`mt-1 inline-flex rounded-full px-3 py-1 text-xs font-semibold
+                          ${
+                            item.severity.toLowerCase().includes("yüksek") ||
+                            item.severity.toLowerCase().includes("kritik")
+                              ? "bg-red-100 text-red-700"
+                              : item.severity.toLowerCase().includes("orta")
+                              ? "bg-yellow-100 text-yellow-700"
+                              : item.severity.toLowerCase().includes("düşük")
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-700"
+                          }`}
+                      >
+                        {item.severity}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </div>
                 </div>
 
-                <div>
-                  <p className="text-gray-500">Termin</p>
-                  <p className="font-medium">
-                    {item.deadline && item.deadline.trim() !== ""
-                      ? item.deadline
-                      : "—"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-gray-500 text-sm">Önem Seviyesi</p>
-
-                  {item.severity ? (
-                    <span
-                      className={`inline-flex items-center mt-1 rounded-full px-3 py-1 text-xs font-semibold
-                        ${
-                          item.severity.toLowerCase().includes("yüksek") ||
-                          item.severity.toLowerCase().includes("kritik")
-                            ? "bg-red-100 text-red-700"
-                            : item.severity.toLowerCase().includes("orta")
-                            ? "bg-yellow-100 text-yellow-700"
-                            : item.severity.toLowerCase().includes("düşük")
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-700"
-                        }`}
-                    >
-                      {item.severity}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">—</span>
-                  )}
-                </div>
-              </div>
 
               {/* CONTENT */}
-              <div className="space-y-6 text-sm">
+              <div className="space-y-4 sm:space-y-6 text-sm">
 
                 {/* RISK / NONCONFORMITY */}
                 <div className="space-y-2">
@@ -372,28 +371,12 @@ export default function ManualDofDetailPage() {
                     </p>
                   </div>
 
-                  <div className="rounded-lg bg-gray-50 border px-4 py-3">
-                    <p className="whitespace-pre-line leading-relaxed text-gray-700">
+                  <div className="rounded-lg bg-gray-50 border px-3 py-3 sm:px-4 sm:py-3">
+                    <p className="whitespace-pre-line leading-relaxed text-gray-700 break-words">
                       {item.risk_description}
                     </p>
                   </div>
                 </div>
-
-                {/* ACTION
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    <p className="font-semibold text-gray-800">
-                      Planlanan Düzeltici / Önleyici Faaliyet
-                    </p>
-                  </div>
-
-                  <div className="rounded-lg bg-gray-50 border px-4 py-3">
-                    <p className="whitespace-pre-line leading-relaxed text-gray-700">
-                      {item.action_description || "Belirtilmemiştir."}
-                    </p>
-                  </div>
-                </div> */}
 
                 {/* LONG DESCRIPTION */}
                 {item.long_description && (
@@ -405,8 +388,8 @@ export default function ManualDofDetailPage() {
                       </p>
                     </div>
 
-                    <div className="rounded-lg bg-gray-50 border px-4 py-3">
-                      <p className="whitespace-pre-line leading-relaxed text-gray-700">
+                    <div className="rounded-lg bg-gray-50 border px-3 py-3 sm:px-4 sm:py-3">
+                      <p className="whitespace-pre-line leading-relaxed text-gray-700 break-words">
                         {item.long_description}
                       </p>
                     </div>
@@ -414,13 +397,12 @@ export default function ManualDofDetailPage() {
                 )}
               </div>
 
-
               {/* EVIDENCE */}
               <div className="space-y-3 border-t pt-4">
                 {!isReadOnly && (
                   <button
                     onClick={() => setEvidenceFor(item.id)}
-                    className="rounded-lg border px-3 py-1.5 text-sm hover:bg-gray-50"
+                    className="w-full sm:w-auto rounded-lg border px-3 py-2 sm:py-1.5 text-sm hover:bg-gray-50"
                   >
                     Kanıt Ekle
                   </button>
@@ -429,7 +411,8 @@ export default function ManualDofDetailPage() {
                 {item.files && item.files.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Resimler</p>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
                       {item.files.map(f => (
                         <a
                           key={f.id}
@@ -440,7 +423,7 @@ export default function ManualDofDetailPage() {
                         >
                           <img
                             src={f.file.url}
-                            className="h-32 w-full object-cover group-hover:opacity-90"
+                            className="h-44 sm:h-32 w-full object-cover group-hover:opacity-90"
                           />
                           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/30">
                             <span className="rounded bg-black/60 px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100">
@@ -452,41 +435,43 @@ export default function ManualDofDetailPage() {
                     </div>
                   </div>
                 )}
-              </div>        
+              </div>
+
               {/* COMPLETE */}
-              {!isReadOnly && item.status !== "completed" && (
-                <div className="border-t pt-4 space-y-2">
+                {!isReadOnly && item.status !== "completed" && (
+                  <div className="border-t pt-4 space-y-2">
 
-                  {/* UYARI – Kanıt yoksa bilgilendir */}
-                  {!hasEvidence && (
-                    <p className="text-xs text-amber-600">
-                      Bu madde için henüz kanıt eklenmemiştir.
-                    </p>
-                  )}
+                    {/* UYARI – Kanıt yoksa bilgilendir */}
+                    {!hasEvidence && (
+                      <p className="text-xs text-amber-600">
+                        Bu madde için henüz kanıt eklenmemiştir.
+                      </p>
+                    )}
 
-                  <div className="flex justify-end">
-                    <button
-                      disabled={completingItemId === item.id}
-                      onClick={async () => {
-                        setCompletingItemId(item.id);
-                        try {
-                          await fetch("/api/dof/item-complete", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ item_id: item.id }),
-                          });
-                          mutate();
-                        } finally {
-                          setCompletingItemId(null);
-                        }
-                      }}
-                      className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Maddeyi Tamamla
-                    </button>
+                    <div className="flex justify-stretch sm:justify-end">
+                      <button
+                        disabled={completingItemId === item.id}
+                        onClick={async () => {
+                          setCompletingItemId(item.id);
+                          try {
+                            await fetch("/api/dof/item-complete", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ item_id: item.id }),
+                            });
+                            mutate();
+                          } finally {
+                            setCompletingItemId(null);
+                          }
+                        }}
+                        className="w-full sm:w-auto rounded-lg border px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Maddeyi Tamamla
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+
             </div>            
           );
         })}

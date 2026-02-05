@@ -1,23 +1,60 @@
+/* ===============================
+   DENETRON THEME TOKENS
+   =============================== */
+
+/* ---------- FALLBACK (ilk yükleme) ---------- */
 :root {
-  --background: #06070B;
-  --foreground: #FFFFFF;
+  --background: #f8fafc;
+  --foreground: #0f172a;
 
-  --card: rgba(255,255,255,0.04);
-  --border: rgba(255,255,255,0.10);
+  --card: #ffffff;
+  --card-foreground: #0f172a;
 
-  --primary: #7C6DFE;
-  --primary-foreground: #FFFFFF;
+  --border: #e5e7eb;
+  --muted: #64748b;
+  --muted-foreground: #64748b;
 
-  --accent: #00C4B4;
-  --accent-foreground: #FFFFFF;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
 
-  --sidebar: #0B0C11;
-  --sidebar-foreground: #E3E6F0;
+  --input: #ffffff;
 
-  --topbar: rgba(255,255,255,0.03);
-
+  /* premium defaults */
   --glow-color: rgba(124,109,254,0.35);
+}
 
-  --text-primary: #FFFFFF;
-  --text-secondary: #A0A7B8;
+/* ---------- LIGHT THEME ---------- */
+html[data-theme="light"] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+
+  --border: #e5e7eb;
+  --muted: #64748b;
+  --muted-foreground: #64748b;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+
+  --input: #ffffff;
+}
+
+/* ---------- DARK THEME ---------- */
+html[data-theme="dark"] {
+  --background: #0b1220;
+  --foreground: #e5e7eb;
+
+  --card: #111827;
+  --card-foreground: #e5e7eb;
+
+  --border: #1f2937;
+  --muted: #9ca3af;
+  --muted-foreground: #9ca3af;
+
+  --sidebar: #0f172a;
+  --sidebar-foreground: #e5e7eb;
+
+  --input: #111827;
 }

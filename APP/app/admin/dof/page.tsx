@@ -155,16 +155,18 @@ export default function DofListPage() {
 
 function Header() {
   return (
-    <div>
+    <div className="space-y-1">
       <h1 className="text-3xl font-semibold text-gray-900">
-        Düzeltici & Önleyici Faaliyetler
+        Düzeltici & Önleyici Faaliyet (DÖF) Kayıtları
       </h1>
-      <p className="text-sm text-gray-500 mt-1">
-        Kurumsal denetim kayıtları
+      <p className="text-sm text-gray-500">
+        Gerçekleştirilen denetimler sonucunda oluşturulan düzeltici ve önleyici faaliyetlerin
+        listesi, durumu ve analiz bilgileri.
       </p>
     </div>
   );
 }
+
 
 /* ===================== */
 /* ===== Filters ===== */
@@ -184,49 +186,55 @@ function Filters({
   onExport: (t: "csv" | "xlsx") => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-4 items-center justify-between">
-      <div className="flex gap-3">
-        <select
-          value={status}
-          onChange={(e) => onStatusChange(e.target.value)}
-          className="border rounded px-3 py-2 text-sm"
-        >
-          <option value="">Tümü</option>
-          <option value="open">Açık</option>
-          <option value="closed">Kapalı</option>
-        </select>
+    <div className="rounded-xl border bg-white p-4 space-y-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={hasAi}
-            onChange={(e) => onHasAiChange(e.target.checked)}
-          />
-          AI Analizi Var
-        </label>
-      </div>
+        {/* SOL – FİLTRELER */}
+        <div className="flex flex-wrap items-center gap-4">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">
+              DÖF Durumu
+            </label>
+            <select
+              value={status}
+              onChange={(e) => onStatusChange(e.target.value)}
+              className="border rounded px-3 py-2 text-sm"
+            >
+              <option value="">Tümü</option>
+              <option value="open">Açık</option>
+              <option value="closed">Kapalı</option>
+            </select>
+          </div>
 
-      <div className="flex gap-2">
-        <button
-          onClick={() => onExport("csv")}
-          className="px-3 py-2 border rounded text-sm"
-        >
-          CSV
-        </button>
-        <button
-          onClick={() => onExport("xlsx")}
-          className="px-3 py-2 border rounded text-sm"
-        >
-          Excel
-        </button>
+          <label className="flex items-center gap-2 text-sm mt-5 sm:mt-0">
+            <input
+              type="checkbox"
+              checked={hasAi}
+              onChange={(e) => onHasAiChange(e.target.checked)}
+            />
+            AI Analizi Olanlar
+          </label>
+        </div>
+
+        {/* SAĞ – EXPORT */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => onExport("csv")}
+            className="px-3 py-2 border rounded text-sm hover:bg-gray-50"
+          >
+            CSV Dışa Aktar
+          </button>
+          <button
+            onClick={() => onExport("xlsx")}
+            className="px-3 py-2 border rounded text-sm hover:bg-gray-50"
+          >
+            Excel Dışa Aktar
+          </button>
+        </div>
       </div>
     </div>
   );
 }
-
-/* ===================== */
-/* ===== List ===== */
-/* ===================== */
 
 function List({
   dofs,
@@ -237,35 +245,108 @@ function List({
   loading: boolean;
   error: boolean;
 }) {
-  if (loading && dofs.length === 0)
-    return <p className="text-gray-400">Yükleniyor…</p>;
+  if (loading && dofs.length === 0) {
+    return <p className="text-sm text-gray-400">DÖF kayıtları yükleniyor…</p>;
+  }
 
-  if (error)
-    return <p className="text-red-500">Hata oluştu</p>;
+  if (error) {
+    return <p className="text-sm text-red-600">Veriler yüklenirken hata oluştu.</p>;
+  }
+
+  if (dofs.length === 0) {
+    return (
+      <div className="rounded-lg border bg-gray-50 p-4 text-sm text-gray-500">
+        Seçilen kriterlere uygun DÖF kaydı bulunamadı.
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-4">
       {dofs.map((dof) => (
-        <Link
+        <div
           key={dof.id}
-          href={`/admin/dof/${dof.id}`}
-          className="rounded-xl border bg-white p-4 hover:bg-gray-50"
+          className="group rounded-xl border bg-white p-4 transition hover:bg-gray-50 hover:shadow-sm"
         >
-          <div className="flex justify-between">
-            <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
+            {/* SOL – TIKLANABİLİR ALAN */}
+            <Link
+              href={`/admin/dof/${dof.id}`}
+              className="flex-1 space-y-1"
+            >
               <p className="font-medium text-gray-900">
                 {dof.title}
               </p>
               <p className="text-xs text-gray-400">
+                Oluşturulma Tarihi:{" "}
                 {new Date(dof.created_at).toLocaleDateString("tr-TR")}
               </p>
+            </Link>
+
+            {/* SAĞ – BADGE + AKSİYONLAR */}
+            <div className="flex items-center gap-2 text-xs">
+
+              {dof.has_ai && (
+                <span className="rounded-full bg-indigo-100 px-2 py-1 text-indigo-700">
+                  AI Analizi
+                </span>
+              )}
+
+              <span
+                className={`rounded-full px-2 py-1 font-medium
+                  ${
+                    dof.status === "open"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-emerald-100 text-emerald-700"
+                  }
+                `}
+              >
+                {dof.status === "open" ? "Açık" : "Kapalı"}
+              </span>
+
+              {/* 🔴 SİL BUTONU (SADECE KAPALI DÖF) */}
+              {dof.status !== "open" && (
+                <button
+                  onClick={async (e) => {
+                    e.preventDefault(); // Link tetiklenmesin
+                    e.stopPropagation();
+
+                    const ok = confirm(
+                      "Bu DÖF kaydı kalıcı olarak silinecektir.\nDevam etmek istiyor musunuz?"
+                    );
+                    if (!ok) return;
+
+                    const res = await fetch("/api/dof/manual/delete", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ dof_id: dof.id }),
+                    });
+
+                    if (!res.ok) {
+                      const json = await res.json();
+                      alert(json.error || "DÖF silinemedi.");
+                      return;
+                    }
+
+                    // ✅ En basit ve güvenli çözüm
+                    location.reload();
+
+                    // 👉 İstersen burada SWR mutate ile de yapabiliriz
+                  }}
+                  className="rounded-lg border border-red-200 px-2 py-1 text-red-600 hover:bg-red-50"
+                  title="DÖF Kaydını Sil"
+                >
+                  Sil
+                </button>
+              )}
+
             </div>
-            <span className="text-xs">
-              {dof.status === "open" ? "Açık" : "Kapalı"}
-            </span>
           </div>
-        </Link>
+        </div>
       ))}
     </div>
   );
 }
+
+

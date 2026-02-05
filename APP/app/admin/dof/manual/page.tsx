@@ -60,207 +60,253 @@ export default function ManualDofListPage() {
     );
   }
 
-  /* ================= RENDER ================= */
-
-  return (
-    <div className="mx-auto max-w-[1400px] px-6 py-8 space-y-6">
-      {/* ================= PAGE HEADER ================= */}
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
-            Manuel DÖF’ler
-          </h1>
-          <p className="text-sm text-gray-600">
-            Organizasyon bazlı manuel düzeltici / önleyici faaliyet kayıtları
-          </p>
-        </div>
-
-        <Link
-          href="/admin/dof/manual/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
-        >
-          <FileText size={16} />
-          Yeni DÖF
-        </Link>
+ return (
+  <div className="mx-auto max-w-[1400px] px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+    {/* ================= PAGE HEADER ================= */}
+    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div className="space-y-1">
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-gray-900">
+          Manuel DÖF’ler
+        </h1>
+        <p className="text-sm text-gray-600">
+          Organizasyon bazlı manuel düzeltici / önleyici faaliyet kayıtları
+        </p>
       </div>
 
-      {/* ================= TABLE ================= */}
-      <div className="rounded-xl border bg-white shadow-sm">
-        <table className="min-w-full border-collapse">
-          <thead>
-            <tr className="border-b bg-gray-50 text-xs font-semibold text-gray-600">
-              <th className="px-6 py-3 text-left">DÖF No</th>
-              <th className="px-6 py-3 text-left">Açıklama</th>
-              <th className="px-6 py-3 text-left">Durum</th>
-              <th className="px-6 py-3 text-right">Tarih</th>
-              <th className="px-6 py-3 text-right"></th>
-            </tr>
-          </thead>
+      <Link
+        href="/admin/dof/manual/new"
+        className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
+      >
+        <FileText size={16} />
+        Yeni DÖF
+      </Link>
+    </div>
 
-          <tbody>
-            {dofs.length === 0 && (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="px-6 py-16 text-center text-sm text-gray-500"
-                >
-                  Henüz manuel DÖF kaydı bulunmuyor.
-                </td>
-              </tr>
-            )}
+    {/* ================= DESKTOP TABLE ================= */}
+    <div className="hidden md:block rounded-xl border bg-white shadow-sm overflow-x-auto">
+      <table className="min-w-full border-collapse">
+        <thead>
+          <tr className="border-b bg-gray-50 text-xs font-semibold text-gray-600">
+            <th className="px-6 py-3 text-left">DÖF No</th>
+            <th className="px-6 py-3 text-left">Açıklama</th>
+            <th className="px-6 py-3 text-left">Durum</th>
+            <th className="px-6 py-3 text-right">Tarih</th>
+            <th className="px-6 py-3 text-right"></th>
+          </tr>
+        </thead>
 
-            {dofs.map((d: any) => (
-              <tr
-                key={d.id}
-                className="border-b last:border-b-0 hover:bg-gray-50 transition"
+        <tbody>
+          {dofs.length === 0 && (
+            <tr>
+              <td
+                colSpan={5}
+                className="px-6 py-16 text-center text-sm text-gray-500"
               >
-                {/* DÖF NO */}
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                Henüz manuel DÖF kaydı bulunmuyor.
+              </td>
+            </tr>
+          )}
+
+          {dofs.map((d: any) => (
+            <tr
+              key={d.id}
+              className="border-b last:border-b-0 hover:bg-gray-50 transition"
+            >
+              <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                <Link
+                  href={`/admin/dof/manual/${d.id}`}
+                  className="hover:text-blue-600"
+                >
+                  {d.report_no}
+                </Link>
+              </td>
+
+              <td className="px-6 py-4 text-sm text-gray-600 max-w-[480px]">
+                <div className="line-clamp-2">
+                  {d.description ?? "—"}
+                </div>
+              </td>
+
+              <td className="px-6 py-4">
+                {d.status === "closed" ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                    <CheckCircle2 size={14} />
+                    Kapalı
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                    Açık
+                  </span>
+                )}
+              </td>
+
+              <td className="px-6 py-4 text-right text-sm text-gray-500">
+                {new Date(d.created_at).toLocaleDateString("tr-TR")}
+              </td>
+
+              <td className="px-6 py-4 text-right">
+                <div className="inline-flex items-center gap-4">
                   <Link
                     href={`/admin/dof/manual/${d.id}`}
-                    className="hover:text-blue-600"
+                    className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
                   >
-                    {d.report_no}
+                    <ExternalLink size={14} />
+                    Detay
                   </Link>
-                </td>
 
-                {/* DESCRIPTION */}
-                <td className="px-6 py-4 text-sm text-gray-600 max-w-[480px]">
-                  <div className="line-clamp-2">
-                    {d.description ?? "—"}
-                  </div>
-                </td>
+                  <button
+                    onClick={async () => {
+                      const ok = window.confirm(
+                        "Bu DÖF kalıcı olarak silinecektir.\nBu işlem geri alınamaz.\n\nDevam etmek istiyor musunuz?"
+                      );
+                      if (!ok) return;
 
-                {/* STATUS */}
-                <td className="px-6 py-4">
-                  {d.status === "closed" ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-                      <CheckCircle2 size={14} />
-                      Kapalı
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
-                      Açık
-                    </span>
-                  )}
-                </td>
+                      const res = await fetch("/api/dof/manual/delete", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ dof_id: d.id }),
+                      });
 
-                {/* DATE */}
-                <td className="px-6 py-4 text-right text-sm text-gray-500">
-                  {new Date(d.created_at).toLocaleDateString("tr-TR")}
-                </td>
+                      const result = await res.json();
+                      if (!res.ok) {
+                        window.alert(result.error ?? "Silme işlemi başarısız");
+                        return;
+                      }
 
-                {/* ACTION */}
-                <td className="px-6 py-4 text-right">
-                  <div className="inline-flex items-center gap-4">
-                    {/* DETAY */}
-                    <Link
-                      href={`/admin/dof/manual/${d.id}`}
-                      className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
-                    >
-                      <ExternalLink size={14} />
-                      Detay
-                    </Link>
+                      mutate(
+                        `/api/dof/manual/list?page=${page}&pageSize=${PAGE_SIZE}`
+                      );
+                    }}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 size={14} />
+                    Sil
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
 
-                    {/* DELETE */}
-                    <button
-                      onClick={async () => {
-                        const ok = window.confirm(
-                          "Bu DÖF kalıcı olarak silinecektir.\nBu işlem geri alınamaz.\n\nDevam etmek istiyor musunuz?"
-                        );
-                        if (!ok) return;
+    {/* ================= MOBILE LIST ================= */}
+    <div className="md:hidden space-y-4">
+      {dofs.length === 0 && (
+        <div className="rounded-xl border bg-white p-6 text-center text-sm text-gray-500">
+          Henüz manuel DÖF kaydı bulunmuyor.
+        </div>
+      )}
 
-                        const res = await fetch(
-                          "/api/dof/manual/delete",
-                          {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ dof_id: d.id }),
-                          }
-                        );
+      {dofs.map((d: any) => (
+        <div
+          key={d.id}
+          className="rounded-xl border bg-white p-4 space-y-3 shadow-sm"
+        >
+          <div className="flex justify-between items-start gap-3">
+            <Link
+              href={`/admin/dof/manual/${d.id}`}
+              className="font-semibold text-blue-600"
+            >
+              {d.report_no}
+            </Link>
 
-                        const result = await res.json();
-
-                        if (!res.ok) {
-                          window.alert(result.error ?? "Silme işlemi başarısız");
-                          return;
-                        }
-
-                        // 🔄 Listeyi yenile (reload yok)
-                        mutate(
-                          `/api/dof/manual/list?page=${page}&pageSize=${PAGE_SIZE}`
-                        );
-                      }}
-                      className="inline-flex items-center gap-1 text-sm font-medium text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 size={14} />
-                      Sil
-                    </button>
-                  </div>
-                </td>
-
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-      {/* ================= FOOTER / PAGINATION ================= */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t bg-gray-50 px-6 py-3 text-sm">
-            {/* LEFT INFO */}
-            <div className="text-gray-600">
-              Toplam <strong>{total}</strong> kayıt ·{" "}
-              <span>
-                Sayfa <strong>{page}</strong> / {totalPages}
+            {d.status === "closed" ? (
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                Kapalı
               </span>
-            </div>
+            ) : (
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                Açık
+              </span>
+            )}
+          </div>
 
-            {/* RIGHT CONTROLS */}
-            <div className="flex items-center gap-1">
-              {/* FIRST */}
-              <button
-                onClick={() => setPage(1)}
-                disabled={page === 1}
-                className="rounded-md border px-2 py-1 text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
-                title="İlk sayfa"
-              >
-                «
-              </button>
+          <div className="text-sm text-gray-600 line-clamp-2">
+            {d.description ?? "—"}
+          </div>
 
-              {/* PREVIOUS */}
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="rounded-md border px-2 py-1 text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
-                title="Önceki sayfa"
-              >
-                ‹
-              </button>
+          <div className="flex justify-between items-center text-xs text-gray-500">
+            <span>
+              {new Date(d.created_at).toLocaleDateString("tr-TR")}
+            </span>
 
-              {/* NEXT */}
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="rounded-md border px-2 py-1 text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
-                title="Sonraki sayfa"
+            <div className="flex items-center gap-4">
+              <Link
+                href={`/admin/dof/manual/${d.id}`}
+                className="text-blue-600 font-medium"
               >
-                ›
-              </button>
+                Detay
+              </Link>
 
-              {/* LAST */}
               <button
-                onClick={() => setPage(totalPages)}
-                disabled={page === totalPages}
-                className="rounded-md border px-2 py-1 text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
-                title="Son sayfa"
+                onClick={async () => {
+                  const ok = window.confirm(
+                    "Bu DÖF kalıcı olarak silinecektir."
+                  );
+                  if (!ok) return;
+
+                  await fetch("/api/dof/manual/delete", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ dof_id: d.id }),
+                  });
+
+                  mutate(
+                    `/api/dof/manual/list?page=${page}&pageSize=${PAGE_SIZE}`
+                  );
+                }}
+                className="text-red-600 font-medium"
               >
-                »
+                Sil
               </button>
             </div>
           </div>
-        )}
-
-      </div>
+        </div>
+      ))}
     </div>
-  );
+
+    {/* ================= FOOTER / PAGINATION ================= */}
+    {totalPages > 1 && (
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t bg-gray-50 px-4 sm:px-6 py-3 text-sm">
+        <div className="text-gray-600">
+          Toplam <strong>{total}</strong> kayıt ·{" "}
+          <strong>{page}</strong> / {totalPages}
+        </div>
+
+        <div className="flex items-center justify-center sm:justify-end gap-1">
+          <button
+            onClick={() => setPage(1)}
+            disabled={page === 1}
+            className="rounded-md border px-2 py-1 disabled:opacity-40"
+          >
+            «
+          </button>
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="rounded-md border px-2 py-1 disabled:opacity-40"
+          >
+            ‹
+          </button>
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="rounded-md border px-2 py-1 disabled:opacity-40"
+          >
+            ›
+          </button>
+          <button
+            onClick={() => setPage(totalPages)}
+            disabled={page === totalPages}
+            className="rounded-md border px-2 py-1 disabled:opacity-40"
+          >
+            »
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+);
+
 }

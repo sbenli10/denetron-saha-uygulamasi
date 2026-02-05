@@ -6,16 +6,16 @@ import {
   Settings,
   BarChart3,
   Folder,
-  GraduationCap,   // 🎓 İSG
-  CalendarCheck,   // 📅 Bu Ayın Eğitimleri
-  FileSpreadsheet, // 📊 Plan / Rapor
+  GraduationCap,
 } from "lucide-react";
+
+/* ================= TYPES ================= */
 
 export interface SidebarNavItem {
   label: string;
   href?: string;
   icon: any;
-  roles: string[];
+  roles: ("admin" | "manager")[];
   premium?: boolean;
   children?: {
     label: string;
@@ -24,10 +24,15 @@ export interface SidebarNavItem {
   }[];
 }
 
+/* ================= NAV ITEMS ================= */
+
 export const NAV_ITEMS: SidebarNavItem[] = [
+  /* ----------------------------------
+     DASHBOARD
+  ---------------------------------- */
   {
-    label: "Dashboard",
-    href: "/admin",
+    label: "📊 Dashboard",
+    href: "/admin/dashboard",
     icon: LayoutGrid,
     roles: ["admin", "manager"],
   },
@@ -36,20 +41,29 @@ export const NAV_ITEMS: SidebarNavItem[] = [
      DENETİMLER
   ---------------------------------- */
   {
-    label: "Denetimler",
+    label: "📝 Denetimler",
     icon: ClipboardList,
     roles: ["admin", "manager"],
     children: [
-      { label: "Tüm Denetimler", href: "/admin/submissions" },
-      { label: "Denetim Oluşturma", href: "/admin/tasks" },
-      { label: "Kullanıcı Tanımlı DÖF’ler", href: "/admin/dof/manual" },
       {
-        label: "Otomatik Denetimler",
+        label: "📋 Tüm Denetimler",
+        href: "/admin/submissions",
+      },
+      {
+        label: "➕ Denetim Oluşturma",
+        href: "/admin/tasks",
+      },
+      {
+        label: "🛠️ Kullanıcı Tanımlı DÖF’ler",
+        href: "/admin/dof/manual",
+      },
+      {
+        label: "🤖 Otomatik Denetimler",
         href: "/admin/cron",
         premium: true,
       },
       {
-        label: "Otomatik Görev Geçmişi",
+        label: "🕒 Otomatik Görev Geçmişi",
         href: "/admin/cron-history",
         premium: true,
       },
@@ -57,16 +71,16 @@ export const NAV_ITEMS: SidebarNavItem[] = [
   },
 
   /* ----------------------------------
-     İSG – EĞİTİM PLANLAMA
+     İSG – EĞİTİM YÖNETİMİ
   ---------------------------------- */
   {
-    label: "İSG",
+    label: "🎓 İSG",
     icon: GraduationCap,
     roles: ["admin", "manager"],
     premium: true,
     children: [
       {
-        label: "Eğitim Analizi",
+        label: "🧠 Eğitim Analizi",
         href: "/admin/isg/training",
       },
       {
@@ -84,36 +98,51 @@ export const NAV_ITEMS: SidebarNavItem[] = [
      RAPORLAR
   ---------------------------------- */
   {
-    label: "Raporlar",
+    label: "📄 Raporlar",
     icon: FileText,
     roles: ["admin", "manager"],
     children: [
-      { label: "Tüm Raporlar", href: "/admin/reports" },
-      { label: "Şablonlar", href: "/admin/templates" },
-      { label: "DÖF Raporları", href: "/admin/dof" },
+      {
+        label: "📚 Tüm Raporlar",
+        href: "/admin/reports",
+      },
+      {
+        label: "🧩 Şablonlar",
+        href: "/admin/templates",
+      },
+      {
+        label: "📑 DÖF Raporları",
+        href: "/admin/dof",
+      },
     ],
   },
 
   /* ----------------------------------
-     KÜTÜPHANE
+     DOSYA KÜTÜPHANESİ
   ---------------------------------- */
   {
-    label: "Dosya Kütüphanesi",
+    label: "🗂️ Dosya Kütüphanesi",
     href: "/admin/library",
     icon: Folder,
     roles: ["admin", "manager"],
   },
 
   /* ----------------------------------
-     KULLANICILAR
+     KULLANICI YÖNETİMİ
   ---------------------------------- */
   {
-    label: "Kullanıcılar",
+    label: "👥 Kullanıcılar",
     icon: Users,
     roles: ["admin"],
     children: [
-      { label: "Rol Düzenleme", href: "/admin/roles" },
-      { label: "Kullanıcılar", href: "/admin/users" },
+      {
+        label: "🔐 Rol Yönetimi",
+        href: "/admin/roles",
+      },
+      {
+        label: "👤 Kullanıcı Listesi",
+        href: "/admin/users",
+      },
     ],
   },
 
@@ -121,7 +150,7 @@ export const NAV_ITEMS: SidebarNavItem[] = [
      PREMIUM MODÜLLER
   ---------------------------------- */
   {
-    label: "İSG İş Asistanı",
+    label: "🚀 İSG İş Asistanı",
     href: "/admin/premium/ocr/dashboard",
     icon: BarChart3,
     roles: ["admin", "manager"],
@@ -132,7 +161,7 @@ export const NAV_ITEMS: SidebarNavItem[] = [
      AYARLAR
   ---------------------------------- */
   {
-    label: "Ayarlar",
+    label: "⚙️ Ayarlar",
     href: "/admin/settings",
     icon: Settings,
     roles: ["admin", "manager"],

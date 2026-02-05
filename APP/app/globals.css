@@ -228,3 +228,77 @@ body {
   animation: shake 0.35s;
 }
 
+/* =============================================================================
+   ACCENT SYSTEM – SINGLE SOURCE OF TRUTH
+============================================================================= */
+
+:root {
+  /* Accent palette */
+  --accent-amber: #f59e0b;
+  --accent-emerald: #10b981;
+  --accent-sky: #0ea5e9;
+  --accent-violet: #8b5cf6;
+
+  /* Default accent (ilk yükleme güvenliği) */
+  --accent-color: var(--accent-violet);
+
+  /* Design tokens */
+  --primary: var(--accent-color);
+  --ring: var(--accent-color);
+  --sidebar-accent: var(--accent-color);
+}
+
+/* Accent switch */
+html[data-accent="amber"]   { --accent-color: var(--accent-amber); }
+html[data-accent="emerald"] { --accent-color: var(--accent-emerald); }
+html[data-accent="sky"]     { --accent-color: var(--accent-sky); }
+html[data-accent="violet"]  { --accent-color: var(--accent-violet); }
+
+/* Accent preview buttons */
+button[data-accent="amber"]   { background-color: var(--accent-amber); }
+button[data-accent="emerald"] { background-color: var(--accent-emerald); }
+button[data-accent="sky"]     { background-color: var(--accent-sky); }
+button[data-accent="violet"]  { background-color: var(--accent-violet); }
+
+/* Tailwind bindings */
+.text-primary {
+  color: var(--accent-color) !important;
+}
+.bg-primary {
+  background-color: var(--accent-color) !important;
+}
+.border-primary {
+  border-color: var(--accent-color) !important;
+}
+.ring-primary {
+  --tw-ring-color: var(--accent-color) !important;
+}
+
+
+/* ===============================
+   LEGACY LIGHT COLOR OVERRIDE
+   (DARK MODE RESCUE LAYER)
+================================ */
+
+html[data-theme="dark"] .bg-white {
+  background-color: var(--card) !important;
+}
+
+html[data-theme="dark"] .text-gray-900 {
+  color: var(--foreground) !important;
+}
+
+html[data-theme="dark"] .text-gray-800 {
+  color: var(--foreground) !important;
+}
+
+html[data-theme="dark"] .text-gray-700,
+html[data-theme="dark"] .text-gray-600,
+html[data-theme="dark"] .text-gray-500 {
+  color: var(--muted-foreground) !important;
+}
+
+html[data-theme="dark"] .border-gray-200,
+html[data-theme="dark"] .border-gray-300 {
+  border-color: var(--border) !important;
+}

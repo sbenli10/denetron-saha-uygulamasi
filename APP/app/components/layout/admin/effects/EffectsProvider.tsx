@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo } from "react";
 import GlowEffect from "./GlowEffect";
 import GridEffect from "./GridEffect";
 import ScanlineEffect from "./ScanlineEffect";
@@ -26,16 +26,23 @@ const EffectsContext = createContext<EffectsContextType>({
 export function EffectsProvider({ children }: { children: React.ReactNode }) {
   const { settings, setSettings } = useSettings();
 
-  // Light modda efektleri zorla kapat
   const isLight = settings.theme === "light";
 
-  // Local state yok; direkt Settings’ten türetiyoruz
-  const effects: EffectsState = useMemo(() => {
-    if (isLight) return { glow: false, grid: false, scanline: false };
+  /**
+   * 🔒 Final effective state
+   * - Light mode → always OFF
+   * - Dark mode → from settings
+   */
+  const effects = useMemo<EffectsState>(() => {
+    if (isLight) {
+      return { glow: false, grid: false, scanline: false };
+    }
     return settings.effects;
   }, [isLight, settings.effects]);
 
-  // Dışarıdan (UI) toggle etmek istersek Settings’e yazar
+  /**
+   * External toggle support (Settings UI)
+   */
   const setEffects = (next: EffectsState) => {
     setSettings({
       ...settings,
@@ -43,11 +50,18 @@ export function EffectsProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  // Tema light’a geçince effects state’i de temiz kalsın (persist)
+  /**
+   * ⚠️ Safety net:
+   * If user switches to light theme,
+   * persistently disable all effects
+   */
   useEffect(() => {
     if (isLight) {
       const anyOn =
-        settings.effects.glow || settings.effects.grid || settings.effects.scanline;
+        settings.effects.glow ||
+        settings.effects.grid ||
+        settings.effects.scanline;
+
       if (anyOn) {
         setSettings({
           ...settings,
@@ -55,18 +69,30 @@ export function EffectsProvider({ children }: { children: React.ReactNode }) {
         });
       }
     }
+    // intentionally omit settings from deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLight]);
 
   return (
     <EffectsContext.Provider value={{ ...effects, setEffects }}>
-      <div className="relative min-h-screen bg-background text-foreground">
-        {/* Effects only when allowed */}
-        {!isLight && effects.glow && <GlowEffect />}
-        {!isLight && effects.grid && <GridEffect />}
-        {!isLight && effects.scanline && <ScanlineEffect />}
+      {/* Root wrapper */}
+      <div className="relative min-h-screen bg-background text-foreground overflow-hidden">
+        {/* ===== VISUAL EFFECT LAYER ===== */}
+        {!isLight && (
+          <div
+            aria-hidden
+            className="pointer-events-none fixed inset-0 z-0"
+          >
+            {effects.glow && <GlowEffect />}
+            {effects.grid && <GridEffect />}
+            {effects.scanline && <ScanlineEffect />}
+          </div>
+        )}
 
-        {children}
+        {/* ===== APP CONTENT ===== */}
+        <div className="relative z-10">
+          {children}
+        </div>
       </div>
     </EffectsContext.Provider>
   );

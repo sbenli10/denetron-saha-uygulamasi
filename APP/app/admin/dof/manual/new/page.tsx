@@ -70,53 +70,62 @@ export default function ManualDofCreatePage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-10 space-y-6">
-      <h1 className="text-2xl font-semibold">Manuel DÖF Oluştur</h1>
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-5">
+      <h1 className="text-xl sm:text-2xl font-semibold">
+        Manuel DÖF Oluştur
+      </h1>
 
-      <input
-        placeholder="Konu"
-        value={konu}
-        onChange={e => setKonu(e.target.value)}
-        className="w-full border rounded-lg px-3 py-2"
-      />
+      <div className="space-y-4">
+        <input
+          placeholder="Konu"
+          value={konu}
+          onChange={(e) => setKonu(e.target.value)}
+          className="w-full border rounded-lg px-3 py-2 text-sm sm:text-base"
+        />
 
-      <input
-        placeholder="Sayı"
-        value={sayi}
-        onChange={e => setSayi(e.target.value)}
-        className="w-full border rounded-lg px-3 py-2"
-      />
+        <input
+          placeholder="Sayı"
+          value={sayi}
+          onChange={(e) => setSayi(e.target.value)}
+          className="w-full border rounded-lg px-3 py-2 text-sm sm:text-base"
+        />
 
-      <input
-        type="date"
-        value={reportDate}
-        onChange={e => setReportDate(e.target.value)}
-        className="w-full border rounded-lg px-3 py-2"
-      />
+        <input
+          type="date"
+          value={reportDate}
+          onChange={(e) => setReportDate(e.target.value)}
+          className="w-full border rounded-lg px-3 py-2 text-sm sm:text-base"
+        />
 
-      <input
-        placeholder="İSG Uzmanı"
-        value={isgUzmani}
-        onChange={e => setIsgUzmani(e.target.value)}
-        className="w-full border rounded-lg px-3 py-2"
-      />
+        <input
+          placeholder="İSG Uzmanı"
+          value={isgUzmani}
+          onChange={(e) => setIsgUzmani(e.target.value)}
+          className="w-full border rounded-lg px-3 py-2 text-sm sm:text-base"
+        />
 
-      <input
-        placeholder="Bildirim Şekli (E-posta, Yazılı vb.)"
-        value={bildirimSekli}
-        onChange={e => setBildirimSekli(e.target.value)}
-        className="w-full border rounded-lg px-3 py-2"
-      />
+        <input
+          placeholder="Bildirim Şekli (E-posta, Yazılı vb.)"
+          value={bildirimSekli}
+          onChange={(e) => setBildirimSekli(e.target.value)}
+          className="w-full border rounded-lg px-3 py-2 text-sm sm:text-base"
+        />
+      </div>
 
-      {error && <div className="text-red-600 text-sm">{error}</div>}
+      {error && (
+        <div className="text-red-600 text-sm">
+          {error}
+        </div>
+      )}
 
       <button
         onClick={handleCreate}
         disabled={loading}
-        className="px-6 py-2 bg-blue-600 text-white rounded-lg"
+        className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg text-sm sm:text-base"
       >
         {loading ? "Oluşturuluyor…" : "DÖF Oluştur"}
       </button>
     </div>
   );
+
 }

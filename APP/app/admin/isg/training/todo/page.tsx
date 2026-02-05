@@ -203,200 +203,206 @@ export default function MonthlyTrainingTodoPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10 space-y-10">
-      <header className="space-y-4">
-        <h1 className="text-3xl font-semibold flex items-center gap-2">
-          <Calendar /> İSG Eğitim Takibi
-        </h1>
+  <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8">
+    {/* HEADER */}
+    <header className="space-y-4">
+      <h1 className="text-xl sm:text-3xl font-semibold flex items-center gap-2">
+        <Calendar />
+        İSG Eğitim Takibi
+      </h1>
 
-        <div className="flex gap-3">
-          <select
-            className="border rounded-lg px-3 py-2 text-sm"
-            value={filterMonth}
-            onChange={(e) =>
-              setFilterMonth(
-                e.target.value === "ALL" ? "ALL" : Number(e.target.value)
-              )
-            }
-          >
-            <option value="ALL">Tüm Aylar</option>
-            {[...Array(12)].map((_, i) => (
-              <option key={i} value={i + 1}>
-                {i + 1}. Ay
-              </option>
-            ))}
-          </select>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <select
+          className="border rounded-lg px-3 py-2 text-sm w-full sm:w-auto"
+          value={filterMonth}
+          onChange={(e) =>
+            setFilterMonth(
+              e.target.value === "ALL" ? "ALL" : Number(e.target.value)
+            )
+          }
+        >
+          <option value="ALL">Tüm Aylar</option>
+          {[...Array(12)].map((_, i) => (
+            <option key={i} value={i + 1}>
+              {i + 1}. Ay
+            </option>
+          ))}
+        </select>
 
-          <select
-            className="border rounded-lg px-3 py-2 text-sm"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as any)}
-          >
-            <option value="ALL">Tümü</option>
-            <option value="PENDING">Bekleyen</option>
-            <option value="DONE">Tamamlanan</option>
-          </select>
+        <select
+          className="border rounded-lg px-3 py-2 text-sm w-full sm:w-auto"
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value as any)}
+        >
+          <option value="ALL">Tümü</option>
+          <option value="PENDING">Bekleyen</option>
+          <option value="DONE">Tamamlanan</option>
+        </select>
+      </div>
+
+      {data && data.meta.reason !== "OK" && (
+        <div className="flex gap-2 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-sm text-yellow-800">
+          <AlertTriangle size={16} />
+          {data.meta.message}
         </div>
+      )}
+    </header>
 
-        {data && data.meta.reason !== "OK" && (
-          <div className="flex gap-2 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-sm text-yellow-800">
-            <AlertTriangle size={16} />
-            {data.meta.message}
+    {/* CONTENT */}
+    {Object.entries(pagedByMonth).map(([month, items]) => {
+      const m = Number(month);
+      const total = groupedByMonth[m]?.length ?? 0;
+      const page = pageByMonth[m] ?? 1;
+      const pages = Math.ceil(total / PAGE_SIZE);
+
+      return (
+        <section key={month} className="border rounded-2xl bg-white shadow-sm">
+          {/* MONTH HEADER */}
+          <div className="px-4 sm:px-6 py-4 border-b bg-gray-50 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+            <h2 className="font-semibold">{month}. Ay Eğitimleri</h2>
+            <span className="text-sm text-gray-500">
+              Toplam {total} kayıt
+            </span>
           </div>
-        )}
-      </header>
 
-      {Object.entries(pagedByMonth).map(([month, items]) => {
-        const m = Number(month);
-        const total = groupedByMonth[m]?.length ?? 0;
-        const page = pageByMonth[m] ?? 1;
-        const pages = Math.ceil(total / PAGE_SIZE);
+          {/* ITEMS */}
+          <div className="divide-y">
+            {items.map((item) => {
+              const locked = busyId === item.id;
 
-        return (
-          <section key={month} className="border rounded-2xl bg-white shadow-sm">
-            <div className="px-6 py-4 border-b bg-gray-50 rounded-t-2xl flex justify-between">
-              <h2 className="font-semibold">{month}. Ay Eğitimleri</h2>
-              <span className="text-sm text-gray-500">
-                Toplam {total} kayıt
-              </span>
-            </div>
+              return (
+                <div
+                  key={item.id}
+                  className={`p-4 sm:p-6 flex flex-col sm:flex-row sm:justify-between gap-4 sm:gap-6 ${
+                    item.executed
+                      ? "bg-green-50 text-gray-600"
+                      : "bg-white hover:bg-gray-50"
+                  }`}
+                >
+                  {/* LEFT */}
+                  <div className="space-y-2">
+                    <p className="font-medium text-gray-900 break-words">
+                      {item.activity}
+                    </p>
 
-            <div className="divide-y">
-              {items.map((item) => {
-                const files = previews[item.id] ?? [];
-                const locked = busyId === item.id;
+                    <p className="text-sm text-gray-500 flex items-center gap-2">
+                      <Calendar size={14} />
+                      {item.planned_period}
+                    </p>
 
-                return (
-                  <div
-                    key={item.id}
-                    className={`p-6 flex justify-between gap-6 border-b last:border-b-0 ${
-                      item.executed
-                        ? "bg-green-50 text-gray-600"
-                        : "bg-white hover:bg-gray-50"
-                    }`}
-                  >
-                    {/* SOL – BİLGİ */}
-                    <div className="space-y-2">
-                      <p className="font-medium text-gray-900">
-                        {item.activity}
-                      </p>
+                    {item.executed ? (
+                      <div className="inline-flex items-center gap-2 text-xs text-green-700 bg-green-100 px-2 py-1 rounded-md w-fit">
+                        <ShieldCheck size={14} />
+                        Tamamlandı
+                        {item.executed_at && (
+                          <span className="text-green-800">
+                            ·{" "}
+                            {new Date(
+                              item.executed_at
+                            ).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center gap-2 text-xs text-amber-700 bg-amber-100 px-2 py-1 rounded-md w-fit">
+                        <AlertTriangle size={14} />
+                        Bekleyen Eğitim
+                      </div>
+                    )}
 
-                      <p className="text-sm text-gray-500 flex items-center gap-2">
-                        <Calendar size={14} />
-                        {item.planned_period}
-                      </p>
+                    {evidences[item.id]?.length > 0 && (
+                      <div className="text-xs text-blue-600">
+                        {evidences[item.id].length} adet kanıt yüklü
+                      </div>
+                    )}
 
-                      {/* DURUM */}
-                      {item.executed ? (
-                        <div className="inline-flex items-center gap-2 text-xs text-green-700 bg-green-100 px-2 py-1 rounded-md w-fit">
-                          <ShieldCheck size={14} />
-                          Tamamlandı
-                          {item.executed_at && (
-                            <span className="text-green-800">
-                              · {new Date(item.executed_at).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-2 text-xs text-amber-700 bg-amber-100 px-2 py-1 rounded-md w-fit">
-                          <AlertTriangle size={14} />
-                          Bekleyen Eğitim
-                        </div>
-                      )}
-
-                      {/* KANIT ÖZETİ */}
-                      {evidences[item.id]?.length > 0 && (
-                        <div className="text-xs text-blue-600">
-                          {evidences[item.id].length} adet kanıt yüklü
-                        </div>
-                      )}
-
-                      {/* BAŞARI MESAJI */}
-                      {successId === item.id && (
-                        <div className="text-sm text-green-700 bg-green-100 px-3 py-2 rounded-lg mt-2">
-                          Eğitim başarıyla kayıt altına alındı.
-                        </div>
-                      )}
-                    </div>
-
-                    {/* SAĞ – AKSİYONLAR */}
-                    <div className="flex flex-col gap-2 min-w-[220px] text-sm">
-                      {item.executed ? (
-                        <>
-                          <Link
-                            href={`/admin/isg/training/${item.id}`}
-                            className="border rounded-lg px-3 py-2 hover:bg-gray-100 text-center"
-                          >
-                            <Eye size={14} className="inline mr-1" />
-                            Eğitim Detayı
-                          </Link>
-
-                          <button
-                            disabled={locked}
-                            onClick={() => undoCompleted(item.id)}
-                            className="border border-red-200 text-red-600 rounded-lg px-3 py-2 hover:bg-red-50"
-                          >
-                            <Undo2 size={14} className="inline mr-1" />
-                            Geri Al
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          {/* 🔥 YENİ: Drawer Aç */}
-                          <button
-                            onClick={() => setDrawerId(item.id)}
-                            className="rounded-lg px-3 py-2 bg-blue-600 text-white"
-                          >
-                            Eğitimi Tamamla
-                          </button>
-
-                          <button
-                            onClick={() => loadEvidences(item.id)}
-                            className="border rounded-lg px-3 py-2 hover:bg-gray-100"
-                          >
-                            Mevcut Kanıtları Gör
-                          </button>
-                        </>
-                      )}
-                    </div>
-
-                    {/* DRAWER */}
-                    <TrainingCompleteDrawer
-                      open={drawerId === item.id}
-                      executionId={item.id}
-                      onClose={() => setDrawerId(null)}
-                      onSubmitSuccess={async () => {
-                        await loadData(); // listeyi yenile
-                        setSuccessId(item.id);
-                      }}
-                    />
+                    {successId === item.id && (
+                      <div className="text-sm text-green-700 bg-green-100 px-3 py-2 rounded-lg mt-2">
+                        Eğitim başarıyla kayıt altına alındı.
+                      </div>
+                    )}
                   </div>
-                );
-              })}
-            </div>
 
-            {pages > 1 && (
-              <div className="flex justify-end gap-2 px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
-                {[...Array(pages)].map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() =>
-                      setPageByMonth((p) => ({ ...p, [m]: i + 1 }))
-                    }
-                    className={`px-3 py-1 text-sm rounded-md border ${
-                      page === i + 1
-                        ? "bg-blue-600 text-white"
-                        : "bg-white"
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
-        );
-      })}
-    </div>
-  );
+                  {/* RIGHT ACTIONS */}
+                  <div className="flex flex-col gap-2 text-sm w-full sm:w-auto sm:min-w-[220px]">
+                    {item.executed ? (
+                      <>
+                        <Link
+                          href={`/admin/isg/training/${item.id}`}
+                          className="border rounded-lg px-3 py-2 hover:bg-gray-100 text-center w-full sm:w-auto"
+                        >
+                          <Eye size={14} className="inline mr-1" />
+                          Eğitim Detayı
+                        </Link>
+
+                        <button
+                          disabled={locked}
+                          onClick={() => undoCompleted(item.id)}
+                          className="border border-red-200 text-red-600 rounded-lg px-3 py-2 hover:bg-red-50 w-full sm:w-auto"
+                        >
+                          <Undo2 size={14} className="inline mr-1" />
+                          Geri Al
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setDrawerId(item.id)}
+                          className="rounded-lg px-3 py-2 bg-blue-600 text-white w-full sm:w-auto"
+                        >
+                          Eğitimi Tamamla
+                        </button>
+
+                        <button
+                          onClick={() => loadEvidences(item.id)}
+                          className="border rounded-lg px-3 py-2 hover:bg-gray-100 w-full sm:w-auto"
+                        >
+                          Mevcut Kanıtları Gör
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* DRAWER */}
+                  <TrainingCompleteDrawer
+                    open={drawerId === item.id}
+                    executionId={item.id}
+                    onClose={() => setDrawerId(null)}
+                    onSubmitSuccess={async () => {
+                      await loadData();
+                      setSuccessId(item.id);
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          {/* PAGINATION */}
+          {pages > 1 && (
+            <div className="flex justify-center sm:justify-end gap-2 px-4 sm:px-6 py-4 border-t bg-gray-50 rounded-b-2xl flex-wrap">
+              {[...Array(pages)].map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() =>
+                    setPageByMonth((p) => ({ ...p, [m]: i + 1 }))
+                  }
+                  className={`px-3 py-1 text-sm rounded-md border ${
+                    page === i + 1
+                      ? "bg-blue-600 text-white"
+                      : "bg-white"
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      );
+    })}
+  </div>
+);
+
+
 }

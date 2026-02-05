@@ -158,21 +158,22 @@ async function createChildFolder(parentId: string) {
      RENDER
   ========================= */
   return (
-    <div className="max-w-7xl mx-auto p-8 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* HEADER */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-xl sm:text-2xl font-semibold">
           📚 Kurumsal Dosya Kütüphanesi
         </h1>
 
         <input
           placeholder="🔍 Dosya, etiket veya tür ara..."
           value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="border rounded-lg px-3 py-2 text-sm w-64"
+          onChange={(e) => setSearch(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm w-full sm:w-72"
         />
       </div>
 
+      {/* TOOLBAR */}
       <LibraryToolbar
         newFolderName={newFolderName}
         setNewFolderName={setNewFolderName}
@@ -180,9 +181,10 @@ async function createChildFolder(parentId: string) {
         onUpload={uploadFile}
       />
 
-      <div className="grid grid-cols-12 gap-6">
+      {/* CONTENT */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
         {/* FOLDER TREE */}
-        <aside className="col-span-3 bg-white border rounded-xl p-4">
+        <aside className="lg:col-span-3 bg-white border rounded-xl p-4">
           <FolderTree
             folders={folders}
             current={currentFolder}
@@ -190,13 +192,12 @@ async function createChildFolder(parentId: string) {
             onRename={renameFolder}
             onDelete={deleteFolder}
             onMove={moveFolder}
-            onCreateChild={createChildFolder} // 👈 EKLENDİ
+            onCreateChild={createChildFolder}
           />
-
         </aside>
 
         {/* FILE GRID */}
-        <main className="col-span-9 bg-white border rounded-xl p-4">
+        <main className="lg:col-span-9 bg-white border rounded-xl p-4 min-h-[200px]">
           {loading ? (
             <p className="text-sm text-gray-400">Yükleniyor…</p>
           ) : (
@@ -206,4 +207,5 @@ async function createChildFolder(parentId: string) {
       </div>
     </div>
   );
+
 }
