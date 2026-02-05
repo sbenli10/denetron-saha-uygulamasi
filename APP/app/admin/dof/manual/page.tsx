@@ -201,70 +201,80 @@ export default function ManualDofListPage() {
       {dofs.map((d: any) => (
         <div
           key={d.id}
-          className="rounded-xl border bg-white p-4 space-y-3 shadow-sm"
+          className="rounded-xl border bg-white p-4 shadow-sm space-y-4"
         >
-          <div className="flex justify-between items-start gap-3">
-            <Link
-              href={`/admin/dof/manual/${d.id}`}
-              className="font-semibold text-blue-600"
-            >
-              {d.report_no}
-            </Link>
+          {/* HEADER */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-gray-900 break-all">
+                {d.report_no}
+              </p>
+              <p className="text-xs text-gray-500">
+                Oluşturulma:{" "}
+                {new Date(d.created_at).toLocaleDateString("tr-TR")}
+              </p>
+            </div>
 
             {d.status === "closed" ? (
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+              <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
                 Kapalı
               </span>
             ) : (
-              <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+              <span className="shrink-0 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
                 Açık
               </span>
             )}
           </div>
 
+          {/* DESCRIPTION */}
           <div className="text-sm text-gray-600 line-clamp-2">
-            {d.description ?? "—"}
+            {d.description ?? "Açıklama girilmemiştir."}
           </div>
 
-          <div className="flex justify-between items-center text-xs text-gray-500">
-            <span>
-              {new Date(d.created_at).toLocaleDateString("tr-TR")}
-            </span>
+          {/* ACTIONS */}
+          <div className="flex gap-3 pt-2 border-t">
+            <Link
+              href={`/admin/dof/manual/${d.id}`}
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50"
+            >
+              <ExternalLink size={16} />
+              Detay
+            </Link>
 
-            <div className="flex items-center gap-4">
-              <Link
-                href={`/admin/dof/manual/${d.id}`}
-                className="text-blue-600 font-medium"
-              >
-                Detay
-              </Link>
-
+            {d.status !== "open" && (
               <button
                 onClick={async () => {
                   const ok = window.confirm(
-                    "Bu DÖF kalıcı olarak silinecektir."
+                    "Bu DÖF kalıcı olarak silinecektir.\nBu işlem geri alınamaz."
                   );
                   if (!ok) return;
 
-                  await fetch("/api/dof/manual/delete", {
+                  const res = await fetch("/api/dof/manual/delete", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ dof_id: d.id }),
                   });
 
+                  const result = await res.json();
+                  if (!res.ok) {
+                    window.alert(result.error ?? "Silme işlemi başarısız");
+                    return;
+                  }
+
                   mutate(
                     `/api/dof/manual/list?page=${page}&pageSize=${PAGE_SIZE}`
                   );
                 }}
-                className="text-red-600 font-medium"
+                className="inline-flex items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
               >
-                Sil
+                <Trash2 size={16} />
               </button>
-            </div>
+            )}
           </div>
         </div>
       ))}
     </div>
+
 
     {/* ================= FOOTER / PAGINATION ================= */}
     {totalPages > 1 && (
