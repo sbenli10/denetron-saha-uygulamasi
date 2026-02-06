@@ -2,10 +2,9 @@
 
 import { LogOut, Settings, User, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { signOutAction } from "@/app/auth/signOutAction";
 import DenetronPremiumBadge from "@/app/components/premium/DenetronPremiumBadge";
 import { applyRipple } from "@/app/components/ui/ripple";
+import { signOutAction } from "@/app/auth/signOutAction";
 
 interface ProfileUser {
   name?: string;
@@ -24,40 +23,34 @@ function initials(v?: string) {
 export default function ProfileMenu({ user }: { user: ProfileUser }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
 
   const name = user.name ?? user.email ?? "Kullanıcı";
   const avatar = initials(name);
 
-  // outside click
+  /* ---------- OUTSIDE CLICK ---------- */
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // escape
+  /* ---------- ESC ---------- */
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("keydown", esc);
     return () => document.removeEventListener("keydown", esc);
   }, []);
 
-  async function logout() {
-    startTransition(async () => {
-      await signOutAction();
-      router.push("/login");
-    });
-  }
-
   return (
     <div className="relative select-none" ref={ref}>
-
-      {/* Trigger */}
+      {/* ================= TRIGGER ================= */}
       <button
+        type="button"
         onMouseDown={(e) => applyRipple(e, e.currentTarget)}
         onClick={() => setOpen((v) => !v)}
         className="
@@ -91,7 +84,7 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
         <ChevronDown size={16} className="hidden sm:block text-muted-foreground" />
       </button>
 
-      {/* Dropdown */}
+      {/* ================= DROPDOWN ================= */}
       {open && (
         <div
           className="
@@ -103,7 +96,7 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
             animate-in fade-in zoom-in duration-150
           "
         >
-          {/* Header */}
+          {/* ---------- HEADER ---------- */}
           <div className="px-4 py-3 border-b border-border bg-white/60">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -113,7 +106,6 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
                     {user.email}
                   </div>
                 )}
-
                 {user.role && (
                   <span
                     className="
@@ -131,10 +123,10 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
             </div>
           </div>
 
-          {/* Items */}
+          {/* ---------- ITEMS ---------- */}
           <div className="p-2">
-
             <button
+              type="button"
               onMouseDown={(e) => applyRipple(e, e.currentTarget)}
               className="
                 w-full flex items-center gap-2 rounded-xl px-3 py-2 text-sm
@@ -146,6 +138,7 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
             </button>
 
             <button
+              type="button"
               onMouseDown={(e) => applyRipple(e, e.currentTarget)}
               className="
                 w-full flex items-center mt-1 gap-2 rounded-xl px-3 py-2 text-sm
@@ -158,19 +151,30 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
 
             <div className="my-2 h-px bg-border/70" />
 
-            <button
-              onMouseDown={(e) => applyRipple(e, e.currentTarget)}
-              onClick={logout}
-              disabled={isPending}
-              className="
-                w-full flex items-center gap-2 rounded-xl px-3 py-2 text-sm
-                text-destructive hover:bg-red-50 hover:text-red-600 transition
-                disabled:opacity-60
-              "
+            {/* ---------- LOGOUT (SERVER ACTION) ---------- */}
+            <form
+              action={() => {
+                startTransition(() => {
+                  signOutAction();
+                });
+              }}
             >
-              <LogOut size={16} />
-              {isPending ? "Çıkış yapılıyor…" : "Çıkış Yap"}
-            </button>
+              <button
+                type="submit"
+                onMouseDown={(e) => applyRipple(e, e.currentTarget)}
+                disabled={isPending}
+                className="
+                  w-full flex items-center gap-2 rounded-xl px-3 py-2 text-sm
+                  text-destructive
+                  hover:bg-red-50 hover:text-red-600
+                  transition
+                  disabled:opacity-60
+                "
+              >
+                <LogOut size={16} />
+                {isPending ? "Çıkış yapılıyor…" : "Çıkış Yap"}
+              </button>
+            </form>
           </div>
         </div>
       )}
