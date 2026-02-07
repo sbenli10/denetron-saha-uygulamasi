@@ -42,12 +42,20 @@ export async function uploadLogo(formData: FormData) {
 
   const { error: dbErr } = await admin
     .from("org_settings")
-    .update({ logo_url: publicUrl })
-    .eq("org_id", member.org_id);
+    .upsert(
+      {
+        org_id: member.org_id,
+        logo_url: publicUrl,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "org_id",
+      }
+    );
 
   if (dbErr) {
-    console.error("[LOGO UPLOAD] DB update error:", dbErr);
-    return { error: dbErr.message };
+    console.error("[ORG SETTINGS] DB ERROR:", dbErr);
+    throw dbErr;
   }
 
   console.log("[LOGO UPLOAD] SUCCESS");

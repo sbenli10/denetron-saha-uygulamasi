@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
+import { NextResponse, type NextRequest } from "next/server";
+import { supabaseServiceRoleClient } from "@/lib/supabase/server";
+
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -12,6 +14,8 @@ export function middleware(req: NextRequest) {
     "/reset-password",
     "/auth", // forgot-password vb
   ];
+
+  
 
   if (publicPaths.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();

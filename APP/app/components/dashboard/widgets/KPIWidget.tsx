@@ -1,59 +1,75 @@
-// app/components/dashboard/widgets/KPIWidget.tsx
 "use client";
 
 import { ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+type KPIIntent = "neutral" | "success" | "warning" | "danger";
+
 export default function KPIWidget({
   title,
   value,
   trend = 0,
-  trendUp = true,
+  intent = "neutral",
+  helper,
 }: {
   title: string;
   value: number;
   trend?: number;
-  trendUp?: boolean;
+  intent?: KPIIntent;
+  helper?: string;
 }) {
-  const TrendIcon = trend === 0 ? Minus : trendUp ? ArrowUpRight : ArrowDownRight;
-  const trendColor =
-    trend === 0
-      ? "text-muted-foreground"
-      : trendUp
-      ? "text-[var(--accent-color)]"
-      : "text-red-500";
+  const isUp = trend > 0;
+  const isDown = trend < 0;
+
+  const TrendIcon = trend === 0 ? Minus : isUp ? ArrowUpRight : ArrowDownRight;
+
+  const intentStyles: Record<KPIIntent, string> = {
+    neutral: "text-muted-foreground",
+    success: "text-emerald-500",
+    warning: "text-amber-500",
+    danger: "text-red-500",
+  };
 
   return (
     <div
-      className="
-        rounded-2xl border border-[rgba(255,255,255,0.08)]
-        bg-card/70 backdrop-blur-xl
-        p-5 shadow-[0_8px_28px_rgba(0,0,0,0.2)]
-        hover:shadow-[0_10px_32px_rgba(0,0,0,0.28)]
-        transition
-      "
+      className={cn(
+        "rounded-2xl border bg-card/70 backdrop-blur-xl p-5 transition",
+        "shadow-[0_8px_28px_rgba(0,0,0,0.22)] hover:shadow-[0_12px_36px_rgba(0,0,0,0.32)]",
+        intent === "danger" && "border-red-500/30",
+        intent === "warning" && "border-amber-500/30"
+      )}
     >
-      <div className="text-xs font-medium text-muted-foreground">{title}</div>
+      <div className="flex items-start justify-between">
+        <div className="text-xs font-medium text-muted-foreground">{title}</div>
 
-      <div className="mt-2 flex items-end justify-between">
-        <div>
-          <div className="text-3xl sm:text-4xl font-semibold tracking-tight text-foreground">
-            {new Intl.NumberFormat("tr-TR").format(value)}
-          </div>
-
-          <div className="mt-2 flex items-center gap-2">
-            <TrendIcon className={cn("h-4 w-4", trendColor)} />
-            <span className={cn("text-sm font-semibold", trendColor)}>
-              {trend === 0 ? "%0" : `%${trend}`}
-            </span>
-            <span className="text-xs text-muted-foreground">son 30 gün</span>
-          </div>
-        </div>
-
-        <div className="rounded-xl bg-muted/60 border border-white/10 px-3 py-1 text-xs text-muted-foreground">
+        <span
+          className={cn(
+            "rounded-lg px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+            intentStyles[intent],
+            "bg-muted/40"
+          )}
+        >
           KPI
-        </div>
+        </span>
       </div>
+
+      <div className="mt-3 text-3xl font-semibold tracking-tight text-foreground">
+        {new Intl.NumberFormat("tr-TR").format(value)}
+      </div>
+
+      <div className="mt-3 flex items-center gap-2 text-sm">
+        <TrendIcon className={cn("h-4 w-4", intentStyles[intent])} />
+        <span className={cn("font-semibold", intentStyles[intent])}>
+          {trend === 0 ? "%0" : `%${Math.abs(trend)}`}
+        </span>
+        <span className="text-xs text-muted-foreground">son 30 gün</span>
+      </div>
+
+      {helper && (
+        <div className="mt-2 text-xs text-muted-foreground">
+          {helper}
+        </div>
+      )}
     </div>
   );
 }

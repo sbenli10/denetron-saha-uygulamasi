@@ -1,10 +1,18 @@
 "use client";
 
-import { LogOut, Settings, User, ChevronDown } from "lucide-react";
+import {
+  LogOut,
+  Settings,
+  User,
+  ChevronDown,
+  ShieldCheck,
+} from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import DenetronPremiumBadge from "@/app/components/premium/DenetronPremiumBadge";
 import { applyRipple } from "@/app/components/ui/ripple";
 import { signOutAction } from "@/app/auth/signOutAction";
+import { cn } from "@/lib/utils";
 
 interface ProfileUser {
   name?: string;
@@ -13,6 +21,9 @@ interface ProfileUser {
   isPremium?: boolean;
 }
 
+/* =========================
+   Utils
+========================= */
 function initials(v?: string) {
   const str = (v ?? "U").trim();
   const parts = str.split(" ");
@@ -20,7 +31,11 @@ function initials(v?: string) {
   return str[0]?.toUpperCase() ?? "U";
 }
 
+/* =========================
+   Component
+========================= */
 export default function ProfileMenu({ user }: { user: ProfileUser }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
@@ -28,7 +43,12 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
   const name = user.name ?? user.email ?? "Kullanıcı";
   const avatar = initials(name);
 
-  /* ---------- OUTSIDE CLICK ---------- */
+  /* Close on user change */
+  useEffect(() => {
+    setOpen(false);
+  }, [user.email]);
+
+  /* Outside click */
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -39,145 +59,162 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  /* ---------- ESC ---------- */
+  /* ESC */
   useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("keydown", esc);
     return () => document.removeEventListener("keydown", esc);
   }, []);
 
   return (
-    <div className="relative select-none" ref={ref}>
+    <div ref={ref} className="relative select-none">
       {/* ================= TRIGGER ================= */}
       <button
         type="button"
         onMouseDown={(e) => applyRipple(e, e.currentTarget)}
         onClick={() => setOpen((v) => !v)}
-        className="
-          inline-flex items-center gap-2
-          rounded-xl border border-border/70
-          px-2 py-1.5
-          bg-white/70 backdrop-blur-md
-          hover:bg-indigo-50
-          transition shadow-sm
-        "
+        className={cn(
+          "inline-flex items-center gap-3 rounded-xl",
+          "border border-border/60 bg-background",
+          "px-2.5 py-1.5 shadow-sm transition",
+          "hover:bg-muted/40 hover:shadow-md"
+        )}
       >
-        <span
-          className="
-            inline-flex h-8 w-8 items-center justify-center
-            rounded-full bg-indigo-100 text-indigo-700
-            border border-border shadow-sm
-          "
-        >
+        {/* Avatar */}
+        <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary border border-primary/20">
           <span className="text-xs font-semibold">{avatar}</span>
+          {user.isPremium && (
+            <span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full bg-amber-400 border border-background" />
+          )}
         </span>
 
+        {/* Name / Role */}
         <span className="hidden sm:flex flex-col items-start leading-tight">
-          <span className="truncate max-w-[140px] text-sm font-medium text-foreground">
+          <span className="max-w-[140px] truncate text-sm font-medium">
             {name}
           </span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+            <ShieldCheck size={11} />
             {user.role ?? "Üye"}
           </span>
         </span>
 
-        <ChevronDown size={16} className="hidden sm:block text-muted-foreground" />
+        <ChevronDown
+          size={16}
+          className={cn(
+            "hidden sm:block text-muted-foreground transition-transform",
+            open && "rotate-180"
+          )}
+        />
       </button>
 
       {/* ================= DROPDOWN ================= */}
       {open && (
         <div
-          className="
-            absolute right-0 mt-2 w-64
-            rounded-2xl border border-border
-            bg-white/85 backdrop-blur-xl
-            shadow-[0_8px_28px_rgba(99,102,241,0.14)]
-            overflow-hidden z-[999]
-            animate-in fade-in zoom-in duration-150
-          "
+          className={cn(
+            "absolute right-0 mt-2 w-72 z-[1000] isolate overflow-hidden",
+            "rounded-2xl border border-border",
+            "bg-background",
+            "shadow-[0_30px_80px_rgba(0,0,0,0.45)]"
+          )}
         >
-          {/* ---------- HEADER ---------- */}
-          <div className="px-4 py-3 border-b border-border bg-white/60">
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-border bg-background">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="truncate text-sm font-semibold">{name}</div>
+                <div className="text-sm font-semibold truncate">
+                  {name}
+                </div>
                 {user.email && (
-                  <div className="truncate text-xs text-muted-foreground">
+                  <div className="text-xs text-muted-foreground truncate max-w-[200px]">
                     {user.email}
                   </div>
                 )}
-                {user.role && (
-                  <span
-                    className="
-                      mt-1 inline-block rounded-full px-2 py-0.5
-                      text-[11px] text-muted-foreground
-                      border border-border bg-white/40
-                    "
-                  >
-                    {user.role}
-                  </span>
-                )}
               </div>
-
               {user.isPremium && <DenetronPremiumBadge />}
             </div>
           </div>
 
-          {/* ---------- ITEMS ---------- */}
-          <div className="p-2">
-            <button
-              type="button"
-              onMouseDown={(e) => applyRipple(e, e.currentTarget)}
-              className="
-                w-full flex items-center gap-2 rounded-xl px-3 py-2 text-sm
-                hover:bg-indigo-50 transition
-              "
-            >
-              <User size={16} className="text-muted-foreground" />
-              Profil
-            </button>
+          {/* Actions */}
+          <div className="p-2 bg-background">
+            <MenuItem
+              icon={User}
+              label="Profil"
+              onClick={() => {
+                setOpen(false);
+                router.push("/profil");
+              }}
+            />
 
-            <button
-              type="button"
-              onMouseDown={(e) => applyRipple(e, e.currentTarget)}
-              className="
-                w-full flex items-center mt-1 gap-2 rounded-xl px-3 py-2 text-sm
-                hover:bg-indigo-50 transition
-              "
-            >
-              <Settings size={16} className="text-muted-foreground" />
-              Ayarlar
-            </button>
+           <MenuItem
+              icon={Settings}
+              label="Ayarlar"
+              onClick={() => {
+                setOpen(false);
+                router.push("/admin/settings");
+              }}
+            />
+            <div className="my-2 h-px bg-border" />
 
-            <div className="my-2 h-px bg-border/70" />
-
-            {/* ---------- LOGOUT (SERVER ACTION) ---------- */}
+            {/* Logout */}
             <form
-              action={() => {
+              action={() =>
                 startTransition(() => {
                   signOutAction();
-                });
-              }}
+                })
+              }
             >
-              <button
-                type="submit"
-                onMouseDown={(e) => applyRipple(e, e.currentTarget)}
+              <MenuItem
+                icon={LogOut}
+                label={isPending ? "Çıkış yapılıyor…" : "Çıkış Yap"}
+                danger
                 disabled={isPending}
-                className="
-                  w-full flex items-center gap-2 rounded-xl px-3 py-2 text-sm
-                  text-destructive
-                  hover:bg-red-50 hover:text-red-600
-                  transition
-                  disabled:opacity-60
-                "
-              >
-                <LogOut size={16} />
-                {isPending ? "Çıkış yapılıyor…" : "Çıkış Yap"}
-              </button>
+                type="submit"
+              />
             </form>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+/* =========================
+   Menu Item
+========================= */
+function MenuItem({
+  icon: Icon,
+  label,
+  danger,
+  disabled,
+  onClick,
+  type = "button",
+}: {
+  icon: any;
+  label: string;
+  danger?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
+  type?: "button" | "submit";
+}) {
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "w-full flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition",
+        "hover:bg-muted/40",
+        danger
+          ? "text-destructive hover:bg-destructive/10"
+          : "text-foreground",
+        disabled && "opacity-60 cursor-not-allowed"
+      )}
+    >
+      <Icon size={16} />
+      {label}
+    </button>
   );
 }

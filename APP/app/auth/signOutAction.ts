@@ -1,41 +1,34 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { supabaseServerClient } from "@/lib/supabase/server";
 
-/**
- * HARD SIGN OUT
- * - Supabase session'ı kapatır
- * - Tüm auth cookie'lerini temizler
- * - Next.js RSC cache sızıntısını keser
- * - Kullanıcıyı temiz /login'e gönderir
- */
 export async function signOutAction() {
-  const supabase = supabaseServerClient();
+  console.group("🚪 SIGN OUT ACTION");
 
-  /* --------------------------------------------------
-     1) SUPABASE SESSION DESTROY
-  -------------------------------------------------- */
-  await supabase.auth.signOut();
+  try {
+    const supabase = supabaseServerClient();
 
-  /* --------------------------------------------------
-     2) AUTH COOKIE HARD RESET
-     (sb-*-auth-token dahil)
-  -------------------------------------------------- */
-  const cookieStore = cookies();
+    console.log("🔐 Calling Supabase global signOut...");
 
-  for (const cookie of cookieStore.getAll()) {
-    if (cookie.name.startsWith("sb-")) {
-      cookieStore.set(cookie.name, "", {
-        path: "/",
-        maxAge: 0,
-      });
+    // 🔥 EN KRİTİK SATIR
+    const { error } = await supabase.auth.signOut({
+      scope: "global",
+    });
+
+    if (error) {
+      console.error("❌ Supabase signOut error:", error);
+      throw error;
     }
-  }
 
-  /* --------------------------------------------------
-     3) REDIRECT (CLEAN ENTRY)
-  -------------------------------------------------- */
-  redirect("/login");
+    console.log("✅ Supabase session destroyed (global)");
+
+  } catch (err) {
+    console.error("🔥 signOutAction FAILED:", err);
+  } finally {
+    console.log("➡️ Redirecting to /login");
+    console.groupEnd();
+
+    redirect("/login");
+  }
 }

@@ -1,10 +1,8 @@
-import ShellLayout from "@/components/layout/admin/shell/ShellLayout";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 
 export default function UpgradeSuccessPage() {
   return (
-    <ShellLayout>
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-10">
         <div className="rounded-3xl border border-slate-200 bg-white/80 backdrop-blur p-8 shadow-[0_20px_60px_rgba(0,0,0,0.08)]">
           <div className="flex items-center gap-3 text-emerald-700">
@@ -36,6 +34,5 @@ export default function UpgradeSuccessPage() {
           </div>
         </div>
       </div>
-    </ShellLayout>
   );
 }

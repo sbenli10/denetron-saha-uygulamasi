@@ -1,9 +1,8 @@
 //APP\app\admin\settings\tabs\SecuritySettings.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Shield,
   Smartphone,
   Monitor,
   KeyRound,
@@ -11,11 +10,23 @@ import {
   LogOut,
   RefreshCw,
   Crown,
-  AlertTriangle,
 } from "lucide-react";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 import PremiumRequired from "../../_components/PremiumRequired";
 import { cn } from "@/lib/utils";
+import { parseDevice } from "@/lib/device";
+
+import {
+  getSessions,
+  getDevices,
+  revokeSession,
+  revokeAllSessionsExceptCurrent,
+  toggleTrustedDevice,
+} from "@/app/actions/security";
+
+import { Database } from "@/app/lib/supabase.types";
+
 
 /**
  * Props
@@ -25,6 +36,8 @@ import { cn } from "@/lib/utils";
 export interface SecuritySettingsProps {
   isPremium: boolean;
   role: string | null;
+  userId: string;
+  orgId: string;
 }
 
 /**
@@ -32,13 +45,14 @@ export interface SecuritySettingsProps {
  * Sonraki adım: Supabase auth/session + device fingerprint/agent log tablosuna bağlanacak.
  */
 type SessionItem = {
-  id: string;
-  device: string;
-  ip?: string;
-  city?: string;
+  id: string;            // device_sessions.id
+  sessionId: string;     // refresh_token
+  label: string;         // "Chrome · Windows"
+  isCurrent: boolean;    // is_current
   lastSeenAt: string;
-  current?: boolean;
 };
+
+
 
 type DeviceItem = {
   id: string;
@@ -47,6 +61,8 @@ type DeviceItem = {
   lastSeenAt: string;
   trusted?: boolean;
 };
+
+
 
 function formatTimeTR(iso: string) {
   try {
@@ -133,402 +149,481 @@ function SectionShell({
   );
 }
 
-export default function SecuritySettings({ isPremium, role }: SecuritySettingsProps) {
+
+
+/* ================= COMPONENT ================= */
+
+export default function SecuritySettings({
+  isPremium,
+  role,
+  userId,
+  orgId,
+}: SecuritySettingsProps) {
   const isAdmin = (role ?? "").toLowerCase() === "admin";
 
-  // ---- Mock state (sonraki adım: fetch ile dolduracağız)
+  const [loading, setLoading] = useState(false);
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
-  const [loadingRefresh, setLoadingRefresh] = useState(false);
+  const [sessions, setSessions] = useState<SessionItem[]>([]);
+  const [devices, setDevices] = useState<DeviceItem[]>([]);
+  const supabase = createClientComponentClient<Database>();
+  const [sessionReady, setSessionReady] = useState(false);
+  const [enrolling2FA, setEnrolling2FA] = useState(false);
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [factorId, setFactorId] = useState<string | null>(null);
+  const [challengeId, setChallengeId] = useState<string | null>(null);
+  const [otp, setOtp] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  
+  function reset2FAState() {
+  setEnrolling2FA(false);
+  setQrCode(null);
+  setOtp("");
+  setFactorId(null);
+  setChallengeId(null);
+}
 
-  const sessions: SessionItem[] = useMemo(
-    () => [
-      {
-        id: "sess_current",
-        device: "Chrome • Windows",
-        ip: "88.XXX.XX.10",
-        city: "İstanbul",
-        lastSeenAt: new Date().toISOString(),
-        current: true,
-      },
-      {
-        id: "sess_2",
-        device: "Safari • iPhone",
-        ip: "88.XXX.XX.11",
-        city: "İzmir",
-        lastSeenAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
-      },
-    ],
-    []
-  );
 
-  const devices: DeviceItem[] = useMemo(
-    () => [
-      {
-        id: "dev_1",
-        name: "iPhone 14",
-        platform: "iOS",
-        lastSeenAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-        trusted: true,
-      },
-      {
-        id: "dev_2",
-        name: "Dell Latitude",
-        platform: "Windows",
-        lastSeenAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-        trusted: false,
-      },
-    ],
-    []
-  );
+  useEffect(() => {
+    let mounted = true;
 
-  async function onRefresh() {
-    setLoadingRefresh(true);
+    supabase.auth.getSession().then(({ data }) => {
+      if (mounted) setSessionReady(!!data.session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) {
+        setSessionReady(!!session);
+
+        // Session değiştiyse MFA flow resetlenir
+        reset2FAState();
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+
+
+
+  useEffect(() => {
+    if (!sessionReady) return;
+
+    supabase.auth.mfa
+      .listFactors()
+      .then((res) => {
+        const totpCount = res.data?.totp?.length ?? 0;
+        setTwoFAEnabled(totpCount > 0);
+      })
+      .catch(() => setTwoFAEnabled(false));
+  }, [sessionReady, supabase]);
+
+
+async function start2FAEnrollment() {
+  // 🔐 1. Session hazır mı? (UI-level guard)
+  if (!sessionReady) {
+    alert("Oturum henüz hazır değil. Lütfen tekrar deneyin.");
+    return;
+  }
+
+  // 🧱 2. Double click / race guard
+  if (enrolling2FA) return;
+
+  // 🔥 3. HARD GUARD → MFA için TEK güvenilir kontrol
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    console.error("AUTH STATE BOZUK:", userError);
+    alert(
+      "Kimlik doğrulama durumu bozuk. Lütfen çıkış yapıp tekrar giriş yapın."
+    );
+    reset2FAState();
+    return;
+  }
+
+  // (İsteğe bağlı ama DEBUG için çok faydalı)
+  if (process.env.NODE_ENV === "development") {
+    const session = await supabase.auth.getSession();
+    console.log("SESSION:", session);
+    console.log("USER:", user);
+  }
+
+  setEnrolling2FA(true);
+
+  try {
+    // 4️⃣ ENROLL (TOTP + QR)
+    const { data: enrollData, error: enrollError } =
+      await supabase.auth.mfa.enroll({
+        factorType: "totp",
+      });
+
+    if (enrollError || !enrollData?.totp) {
+      throw enrollError ?? new Error("Enroll başarısız");
+    }
+
+    setFactorId(enrollData.id);
+    setQrCode(enrollData.totp.qr_code);
+
+    // 5️⃣ CHALLENGE (verify öncesi ZORUNLU)
+    const { data: challengeData, error: challengeError } =
+      await supabase.auth.mfa.challenge({
+        factorId: enrollData.id,
+      });
+
+    if (challengeError || !challengeData) {
+      throw challengeError ?? new Error("Challenge başarısız");
+    }
+
+    setChallengeId(challengeData.id);
+  } catch (err) {
+    console.error("MFA ENROLL ERROR:", err);
+    reset2FAState();
+    alert("2FA başlatılırken hata oluştu. Lütfen tekrar deneyin.");
+  }
+}
+
+
+
+
+  async function onVerify2FA() {
+    if (!factorId || !challengeId || otp.length !== 6) return;
+
+    setVerifying(true);
     try {
-      // TODO: burada gerçek endpoint/server action çağrısı yapılacak
-      await new Promise((r) => setTimeout(r, 450));
+      const { error } = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId,
+        code: otp,
+      });
+
+      if (error) throw error;
+
+      // ✅ BAŞARILI
+      setTwoFAEnabled(true);
+      reset2FAState();
+    } catch {
+      // ❌ HATALI → factor’ü temizle
+      await supabase.auth.mfa.unenroll({ factorId });
+      reset2FAState();
     } finally {
-      setLoadingRefresh(false);
+      setVerifying(false);
     }
   }
 
-  function onRevokeSession(sessionId: string) {
-    // TODO: server action -> session revoke
-    alert(`Oturum kapatma (mock): ${sessionId}`);
+
+
+
+
+
+  /* ================= FETCH ================= */
+
+  async function loadData() {
+  setLoading(true);
+  try {
+    const sessionRows = await getSessions(userId, orgId);
+    const deviceRows  = await getDevices(userId, orgId);
+
+    setSessions(
+      sessionRows.map((r: any): SessionItem => ({
+        id: r.id,
+        sessionId: r.session_id,
+        label: parseDevice(r.agent).label,
+        isCurrent: r.is_current === true,
+        lastSeenAt: r.last_seen_at,
+      }))
+    );
+
+    setDevices(
+      deviceRows.map((d: any): DeviceItem => ({
+        id: d.id,
+        name: d.label ?? "Bilinmeyen cihaz",
+        platform: d.platform,
+        lastSeenAt: d.last_seen_at,
+        trusted: d.trusted,
+      }))
+    );
+  } finally {
+    setLoading(false);
+  }
+}
+
+
+  useEffect(() => {
+    loadData();
+  }, [userId, orgId]);
+
+  /* ================= ACTIONS ================= */
+
+  async function onRefresh() {
+    await loadData();
   }
 
-  function onRevokeAllOther() {
-    // TODO: server action -> revoke all except current
-    alert("Diğer tüm oturumları kapat (mock)");
+  async function onRevokeOthers() {
+    const current = sessions.find(s => s.isCurrent);
+    if (!current) return;
+
+    await revokeAllSessionsExceptCurrent(
+      userId,
+      current.sessionId
+    );
+
+    await loadData();
   }
 
-  function onToggleTrustedDevice(deviceId: string) {
-    // TODO: server action -> device trust toggle
-    alert(`Cihaz güven durumu değiştir (mock): ${deviceId}`);
-  }
 
-  function onDisable2FA() {
-    // TODO: server action -> disable
-    setTwoFAEnabled(false);
-  }
 
-  function onEnable2FA() {
-    // Premium + admin gate
-    if (!isPremium) return;
+  async function onToggleDevice(deviceId: string) {
     if (!isAdmin) return;
-
-    // TODO: enroll flow (QR + doğrulama kodu)
-    setTwoFAEnabled(true);
+    await toggleTrustedDevice(deviceId);
+    await loadData();
   }
+
+  /* ================= RENDER ================= */
 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <div className="text-xl sm:text-2xl font-semibold text-foreground">
-            Güvenlik
-          </div>
-          <div className="text-sm text-foreground/60">
-            Hesap güvenliği, aktif oturumlar ve cihaz yetkilendirmelerini yönetin.
-          </div>
+      <div className="flex justify-between items-start">
+        <div>
+          <h2 className="text-2xl font-semibold">Güvenlik</h2>
+          <p className="text-sm text-foreground/60">
+            Oturumlar, cihazlar ve güvenlik ayarları
+          </p>
         </div>
 
         <button
           onClick={onRefresh}
-          className="
-            inline-flex items-center gap-2
-            h-10 px-4 rounded-xl
-            border border-border
-            bg-background/50 hover:bg-accent
-            text-sm font-medium
-            transition
-          "
+          className="h-10 px-4 rounded-xl border bg-background/50 text-sm"
         >
-          <RefreshCw className={cn("h-4 w-4", loadingRefresh && "animate-spin")} />
+          <RefreshCw
+            className={cn("h-4 w-4 inline mr-1", loading && "animate-spin")}
+          />
           Yenile
         </button>
       </div>
 
-      {/* 2FA */}
+     {/* 2FA */}
       <SectionShell
         icon={KeyRound}
         title="İki Aşamalı Doğrulama (2FA)"
-        description="Yetkisiz erişim riskini azaltmak için 2FA önerilir."
+        description="Ekstra güvenlik katmanı"
         right={
-          <div className="flex items-center gap-2">
-            {!isPremium && (
-              <div
-                className="
-                  inline-flex items-center gap-1.5
-                  px-3 py-1.5 rounded-xl
-                  border border-border
-                  bg-background/50
-                  text-xs text-foreground/70
-                "
-              >
-                <Crown className="h-4 w-4 text-amber-500" />
-                Premium
-              </div>
-            )}
-
-            {twoFAEnabled ? (
-              <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                Aktif
-              </div>
-            ) : (
-              <div className="text-xs font-medium text-foreground/60">Kapalı</div>
-            )}
-          </div>
+          !isPremium && (
+            <span className="inline-flex items-center gap-1 text-xs">
+              <Crown className="h-4 w-4 text-amber-500" /> Premium
+            </span>
+          )
         }
       >
         {!isPremium ? (
-          <div className="rounded-2xl border border-border bg-background/30 p-4">
-            <PremiumRequired role={role} />
-          </div>
+          <PremiumRequired role={role} />
         ) : (
-          <RoleGate role={role}>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="space-y-1">
-                <div className="text-sm font-medium text-foreground">
-                  {twoFAEnabled ? "2FA etkin" : "2FA devre dışı"}
-                </div>
-                <div className="text-sm text-foreground/60">
-                  {twoFAEnabled
-                    ? "Hesabınız ek doğrulama ile korunuyor."
-                    : "Kritik işlemler için ekstra güvenlik katmanı ekleyin."}
-                </div>
-              </div>
+          <>
+            {/* 2FA AKTİF DEĞİL */}
+            {!twoFAEnabled && !enrolling2FA && (
+              <button
+                disabled={!sessionReady}
+                onClick={start2FAEnrollment}
+                className="
+                  h-10 px-4 rounded-xl
+                  bg-primary text-primary-foreground
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                "
+              >
+                2FA’yı Etkinleştir
+              </button>
+            )}
 
-              <div className="flex gap-2">
-                {twoFAEnabled ? (
-                  <button
-                    onClick={onDisable2FA}
-                    className="
-                      h-10 px-4 rounded-xl
-                      border border-border
-                      bg-background hover:bg-accent
-                      text-sm font-medium
-                      transition
-                    "
-                  >
-                    2FA’yı Kapat
-                  </button>
-                ) : (
-                  <button
-                    onClick={onEnable2FA}
-                    className="
-                      h-10 px-4 rounded-xl
-                      bg-primary text-primary-foreground
-                      hover:opacity-90
-                      text-sm font-semibold
-                      transition
-                    "
-                  >
-                    2FA’yı Etkinleştir
-                  </button>
+            {/* 2FA ENROLL FLOW */}
+            {enrolling2FA && factorId && challengeId && (
+              <div className="space-y-4 mt-4">
+                {qrCode && (
+                  <div className="flex flex-col items-center gap-2">
+                    <img
+                      src={qrCode}
+                      alt="2FA QR Code"
+                      className="w-40 h-40"
+                    />
+                    <p className="text-xs text-foreground/60 text-center">
+                      Authenticator uygulamasıyla QR kodu okut
+                    </p>
+                  </div>
                 )}
-              </div>
-            </div>
 
-            <div
-              className="
-                mt-4 rounded-xl
-                border border-border
-                bg-background/30
-                p-4
-                flex items-start gap-3
-              "
-            >
-              <Shield className="h-5 w-5 text-primary mt-0.5" />
-              <div className="text-sm text-foreground/70 leading-relaxed">
-                2FA etkinleştirme akışı (QR + doğrulama kodu) bir sonraki adımda Supabase MFA
-                veya kendi OTP servisiniz ile bağlanacak.
+                <input
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  placeholder="6 haneli kod"
+                  inputMode="numeric"
+                  maxLength={6}
+                  className="h-10 w-full rounded-xl border px-3"
+                />
+
+                <button
+                  onClick={onVerify2FA}
+                  disabled={verifying || otp.length !== 6}
+                  className="
+                    h-10 px-4 rounded-xl
+                    bg-emerald-600 text-white
+                    disabled:opacity-50
+                  "
+                >
+                  {verifying ? "Doğrulanıyor..." : "Doğrula"}
+                </button>
+
+                <button
+                  onClick={async () => {
+                    if (factorId) {
+                      await supabase.auth.mfa.unenroll({ factorId });
+                    }
+                    reset2FAState();
+                  }}
+                  className="h-10 px-4 rounded-xl border text-sm"
+                >
+                  Vazgeç
+                </button>
               </div>
-            </div>
-          </RoleGate>
+            )}
+
+            {/* 2FA AKTİF */}
+            {twoFAEnabled && (
+              <div className="text-sm text-emerald-600 font-medium">
+                2FA aktif
+              </div>
+            )}
+          </>
         )}
       </SectionShell>
 
-      {/* Active Sessions */}
+
+
+      {/* Sessions */}
       <SectionShell
         icon={Monitor}
         title="Aktif Oturumlar"
-        description="Hesabınızla açık olan oturumları izleyin ve gerekirse kapatın."
+        description="Bu cihaz hariç tüm oturumlar kapatılır"
         right={
           <button
-            onClick={onRevokeAllOther}
-            className="
-              h-10 px-4 rounded-xl
-              border border-border
-              bg-background/50 hover:bg-accent
-              text-sm font-medium
-              transition
-              inline-flex items-center gap-2
-            "
+            onClick={onRevokeOthers}
+            className="h-10 px-4 rounded-xl border text-sm"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-4 w-4 inline mr-1" />
             Diğerlerini Kapat
           </button>
         }
       >
-        <RoleGate role={role}>
-          {sessions.length === 0 ? (
-            <div className="rounded-xl border border-border bg-background/30 p-4 text-sm text-foreground/60">
-              Aktif oturum bulunamadı.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {sessions.map((s) => (
-                <div
-                  key={s.id}
-                  className="
-                    rounded-xl border border-border
-                    bg-background/30
-                    p-4
-                    flex flex-col sm:flex-row sm:items-center sm:justify-between
-                    gap-3
-                  "
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-xl border border-border bg-background/50 flex items-center justify-center">
-                      <Monitor className="h-5 w-5 text-foreground/70" />
-                    </div>
+        {sessions.length === 0 ? (
+          <div className="text-sm text-foreground/60">
+            Oturum yok
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {sessions.map((s) => (
+              <div
+                key={s.id}
+                className="
+                  rounded-xl border border-border
+                  bg-background/30
+                  p-4
+                  flex flex-col sm:flex-row
+                  sm:items-center sm:justify-between
+                  gap-3
+                "
+              >
+                {/* SOL TARAF */}
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">
+                      {s.label}
+                    </span>
 
-                    <div className="space-y-0.5">
-                      <div className="text-sm font-medium text-foreground">
-                        {s.device}{" "}
-                        {s.current && (
-                          <span className="ml-2 text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                            Bu cihaz
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-foreground/60">
-                        {s.city ? `${s.city} • ` : ""}
-                        {s.ip ? `${s.ip} • ` : ""}
-                        Son aktivite: {formatTimeTR(s.lastSeenAt)}
-                      </div>
-                    </div>
+                    {s.isCurrent && (
+                      <span
+                        className="
+                          text-[11px] px-2 py-0.5 rounded-full
+                          bg-emerald-500/15 text-emerald-600
+                          border border-emerald-500/30
+                        "
+                      >
+                        Bu cihaz
+                      </span>
+                    )}
                   </div>
 
-                  {!s.current && (
-                    <button
-                      onClick={() => onRevokeSession(s.id)}
-                      className="
-                        h-10 px-4 rounded-xl
-                        border border-border
-                        bg-background hover:bg-accent
-                        text-sm font-medium
-                        transition
-                        inline-flex items-center gap-2
-                        self-start sm:self-auto
-                      "
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Oturumu Kapat
-                    </button>
-                  )}
+                  <div className="text-xs text-foreground/60">
+                    Son aktivite: {formatTimeTR(s.lastSeenAt)}
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
 
-          <div className="mt-4 flex items-start gap-2 text-xs text-foreground/60">
-            <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5" />
-            <div>
-              Oturum yönetimi için ideal yaklaşım: auth session’larını (refresh token dahil) sunucu
-              tarafında revoke etmek ve cihaz bilgisini agent log tablosunda saklamak.
-            </div>
+                {/* SAĞ TARAF */}
+                {!s.isCurrent && (
+                  <button
+                    onClick={async () => {
+                      await revokeSession(s.sessionId);
+                      await loadData();
+                    }}
+                    className="
+                      h-9 px-4 rounded-xl
+                      border border-border
+                      text-sm font-medium
+                      hover:bg-accent
+                      transition
+                      self-start sm:self-auto
+                    "
+                  >
+                    Oturumu Kapat
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
-        </RoleGate>
+        )}
       </SectionShell>
 
       {/* Devices */}
       <SectionShell
         icon={Smartphone}
         title="Cihazlar"
-        description="Güvenilen cihazları yönetin. Şüpheli cihazları kaldırın."
+        description="Güven durumu"
         right={
-          <div
-            className="
-              inline-flex items-center gap-2
-              h-10 px-4 rounded-xl
-              border border-border
-              bg-background/50
-              text-sm text-foreground/70
-            "
-          >
+          <span className="inline-flex items-center gap-1 text-sm">
             <Lock className="h-4 w-4" />
-            {isAdmin ? "Yönetici Modu" : "Salt Okunur"}
-          </div>
+            {isAdmin ? "Yönetici" : "Salt okunur"}
+          </span>
         }
       >
         <RoleGate role={role}>
-          {devices.length === 0 ? (
-            <div className="rounded-xl border border-border bg-background/30 p-4 text-sm text-foreground/60">
-              Cihaz kaydı bulunamadı.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {devices.map((d) => (
-                <div
-                  key={d.id}
-                  className="
-                    rounded-xl border border-border
-                    bg-background/30
-                    p-4
-                    flex flex-col sm:flex-row sm:items-center sm:justify-between
-                    gap-3
-                  "
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-xl border border-border bg-background/50 flex items-center justify-center">
-                      <Smartphone className="h-5 w-5 text-foreground/70" />
-                    </div>
-
-                    <div className="space-y-0.5">
-                      <div className="text-sm font-medium text-foreground">
-                        {d.name}
-                        {d.trusted ? (
-                          <span className="ml-2 text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                            Güvenilir
-                          </span>
-                        ) : (
-                          <span className="ml-2 text-[11px] px-2 py-0.5 rounded-full bg-muted text-foreground/70 border border-border">
-                            Standart
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-foreground/60">
-                        {d.platform ? `${d.platform} • ` : ""}
-                        Son görünme: {formatTimeTR(d.lastSeenAt)}
-                      </div>
-                    </div>
+          <div className="space-y-2">
+            {devices.map((d) => (
+              <div
+                key={d.id}
+                className="rounded-xl border bg-background/30 p-4 flex justify-between"
+              >
+                <div>
+                  <div className="font-medium">{d.name}</div>
+                  <div className="text-xs text-foreground/60">
+                    {d.platform} • {formatTimeTR(d.lastSeenAt)}
                   </div>
-
-                  {isAdmin && (
-                    <button
-                      onClick={() => onToggleTrustedDevice(d.id)}
-                      className="
-                        h-10 px-4 rounded-xl
-                        border border-border
-                        bg-background hover:bg-accent
-                        text-sm font-medium
-                        transition
-                        self-start sm:self-auto
-                      "
-                    >
-                      Güven Durumunu Değiştir
-                    </button>
-                  )}
                 </div>
-              ))}
-            </div>
-          )}
 
-          <div className="mt-4 text-xs text-foreground/60">
-            Cihaz yönetimi için öneri: <span className="font-medium">org_id + user_id</span> bazlı bir
-            “device_sessions” tablosu (agent, platform, ip, last_seen, trusted) ile kayıt.
+                {isAdmin && (
+                  <button
+                    onClick={() => onToggleDevice(d.id)}
+                    className="h-9 px-3 rounded-xl border text-sm"
+                  >
+                    {d.trusted ? "Güvenilir" : "Standart"}
+                  </button>
+                )}
+              </div>
+            ))}
+
           </div>
         </RoleGate>
       </SectionShell>

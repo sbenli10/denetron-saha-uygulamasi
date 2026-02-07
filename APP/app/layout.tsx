@@ -9,12 +9,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="tr">
-      <body>
+    <html lang="tr" suppressHydrationWarning>
+      <body className="min-h-screen bg-background text-foreground antialiased">
         <AppProvider>
           {children}
+          <Toaster
+            richColors
+            position="top-right"
+            closeButton
+          />
         </AppProvider>
-        <Toaster richColors position="top-right" closeButton />
       </body>
     </html>
   );

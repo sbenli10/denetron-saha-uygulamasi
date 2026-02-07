@@ -1,17 +1,14 @@
-// APP/app/components/providers/AppProvider.tsx
 "use client";
 
-import React, {
+import {
   createContext,
   useContext,
   useEffect,
-  useMemo,
-  useRef,
   useState,
-  type ReactNode,
+  useRef,
+  ReactNode,
 } from "react";
 import { supabaseAuth } from "@/lib/supabase/auth";
-import type { User } from "@supabase/supabase-js";
 
 /* ===================== TYPES ===================== */
 
@@ -20,7 +17,6 @@ export interface Profile {
   organization_id: string | null;
   role: string | null;
   full_name: string | null;
-  email?: string | null;
 }
 
 export interface Member {
@@ -28,9 +24,7 @@ export interface Member {
   user_id: string;
   org_id: string;
   role: string;
-  role_id?: string | null;
   created_at: string;
-  deleted_at?: string | null;
 }
 
 export interface Organization {
@@ -43,29 +37,16 @@ export interface Organization {
 export interface OrgSettings {
   org_id: string;
   logo_url: string | null;
-  force_2fa?: boolean | null;
-  single_session_required?: boolean | null;
 }
 
 export interface AppContextState {
-  user: User | null;
+  user: any;
   profile: Profile | null;
   member: Member | null;
   organization: Organization | null;
   orgSettings: OrgSettings | null;
-
-  /** auth + app data fully ready */
-  ready: boolean;
-
-  /** convenience */
   loading: boolean;
-
-  /** safe actions */
-  refresh: () => Promise<void>;
-  signOut: () => Promise<void>;
 }
-
-/* ===================== CONTEXT ===================== */
 
 export const AppContext = createContext<AppContextState | null>(null);
 
@@ -74,227 +55,209 @@ export const AppContext = createContext<AppContextState | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const supabase = supabaseAuth();
 
-  // Auth state
-  const [user, setUser] = useState<User | null>(null);
-
-  // App data state
+  const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [member, setMember] = useState<Member | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [orgSettings, setOrgSettings] = useState<OrgSettings | null>(null);
-
-  // Readiness gates (prevents stale UI)
-  const [authReady, setAuthReady] = useState(false);
-  const [dataReady, setDataReady] = useState(false);
-
-  // Prevent out-of-order responses applying to new user
-  const loadSeq = useRef(0);
-
-  const loading = !authReady || !dataReady;
-  const ready = !loading;
-
-  const resetAppState = () => {
-    setProfile(null);
-    setMember(null);
-    setOrganization(null);
-    setOrgSettings(null);
-    setDataReady(false);
+  const [loading, setLoading] = useState(true);
+  const activeUserIdRef = useRef<string | null>(null);
+  const initialState = {
+    user: null,
+    profile: null,
+    member: null,
+    organization: null,
+    orgSettings: null,
+    loading: true,
   };
 
-  /* ---------- 1) INITIAL AUTH (GATE) ---------- */
+  const requestIdRef = useRef(0);
+
+  /* ===================== STATE LOGGER ===================== */
   useEffect(() => {
-    let active = true;
-
-    (async () => {
-      const { data, error } = await supabase.auth.getUser();
-
-      if (!active) return;
-
-      // Fail-closed: auth error -> treat as signed out
-      if (error) {
-        setUser(null);
-        resetAppState();
-        setAuthReady(true);
-        return;
-      }
-
-      setUser(data.user ?? null);
-      setAuthReady(true);
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [supabase]);
-
-  /* ---------- 2) AUTH LISTENER (HARD RESET ON CHANGE) ---------- */
-  useEffect(() => {
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        // On every auth transition, invalidate pending loads
-        loadSeq.current += 1;
-
-        setUser(session?.user ?? null);
-
-        // Reset app state so old user's name/org never flashes
-        resetAppState();
-
-        // Auth is now known for this event
-        setAuthReady(true);
-      }
-    );
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, [supabase]);
-
-  /* ---------- 3) LOAD APP DATA (RACE-SAFE) ---------- */
-  const loadAppData = async (u: User) => {
-    const seq = ++loadSeq.current;
-
-    // While loading for this user:
-    setDataReady(false);
-
-    // PROFILE
-    const { data: pRaw, error: pErr } = await supabase
-      .from("profiles")
-      .select("id, organization_id, role, full_name, email")
-      .eq("id", u.id)
-      .maybeSingle<Profile>();
-
-    // If a newer auth event happened, abort applying results
-    if (seq !== loadSeq.current) return;
-
-    if (pErr) {
-      // Fail-closed on UI: wipe state
-      resetAppState();
-      setDataReady(true);
-      return;
-    }
-
-    setProfile(pRaw ?? null);
-
-    // MEMBER: choose most recent membership to avoid “double org” randomness
-    const { data: members, error: mErr } = await supabase
-    .from("org_members")
-    .select(
-      "id, user_id, org_id, role, role_id, created_at, deleted_at"
-    )
-    .eq("user_id", u.id)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .returns<Member[]>(); // 🔥 KRİTİK
-
-
-    if (seq !== loadSeq.current) return;
-
-    if (mErr) {
-      resetAppState();
-      setDataReady(true);
-      return;
-    }
-
-    const mRaw: Member | null =
-    Array.isArray(members) && members.length > 0
-      ? members[0]
-      : null;
-
-    setMember(mRaw);
-
-
-    // ORG + SETTINGS
-    if (mRaw?.org_id) {
-      const { data: orgRaw, error: orgErr } = await supabase
-        .from("organizations")
-        .select("id, name, slug, is_premium")
-        .eq("id", mRaw.org_id)
-        .maybeSingle<Organization>();
-
-      if (seq !== loadSeq.current) return;
-
-      if (orgErr) {
-        setOrganization(null);
-      } else {
-        setOrganization(orgRaw ?? null);
-      }
-
-      const { data: settingsRaw, error: sErr } = await supabase
-        .from("org_settings")
-        .select("org_id, logo_url, force_2fa, single_session_required")
-        .eq("org_id", mRaw.org_id)
-        .maybeSingle<OrgSettings>();
-
-      if (seq !== loadSeq.current) return;
-
-      if (sErr) {
-        setOrgSettings(null);
-      } else {
-        setOrgSettings(settingsRaw ?? null);
-      }
-    } else {
-      setOrganization(null);
-      setOrgSettings(null);
-    }
-
-    setDataReady(true);
-  };
-
-  useEffect(() => {
-    // Auth not resolved yet -> do nothing
-    if (!authReady) return;
-
-    // Signed out -> app data is “ready” (empty state), no stale UI
-    if (!user) {
-      resetAppState();
-      setDataReady(true);
-      return;
-    }
-
-    loadAppData(user);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authReady, user?.id]); // only rerun when user changes
-
-  /* ---------- ACTIONS ---------- */
-  const refresh = async () => {
-    if (!user) return;
-    await loadAppData(user);
-  };
-
-  const signOut = async () => {
-    // UI fail-closed immediately
-    loadSeq.current += 1;
-    setUser(null);
-    resetAppState();
-    setAuthReady(true);
-    setDataReady(true);
-
-    await supabase.auth.signOut();
-  };
-
-  const value = useMemo<AppContextState>(
-    () => ({
+    console.log("🧠 APP STATE UPDATE", {
       user,
       profile,
       member,
       organization,
       orgSettings,
-      ready,
       loading,
-      refresh,
-      signOut,
-    }),
-    [user, profile, member, organization, orgSettings, ready, loading]
-  );
+    });
+  }, [user, profile, member, organization, orgSettings, loading]);
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  /* ===================== LOAD USER DATA ===================== */
+  const loadUserData = async (userId: string) => {
+    const reqId = ++requestIdRef.current;
+
+    console.group(`🚀 loadUserData START [reqId=${reqId}]`);
+    console.log("👤 userId:", userId);
+    setLoading(true);
+
+    try {
+      console.log("📄 Fetching profile...");
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle<Profile>();
+
+      console.log("📄 profile result:", profile);
+
+      if (reqId !== requestIdRef.current) {
+        console.warn("⛔ profile ignored (stale req)");
+        return;
+      }
+
+      setProfile(profile ?? null);
+
+      console.log("👥 Fetching org_members...");
+      const { data: member } = await supabase
+        .from("org_members")
+        .select("*")
+        .eq("user_id", userId)
+        .is("deleted_at", null)
+        .maybeSingle<Member>();
+
+      console.log("👥 member result:", member);
+
+      if (reqId !== requestIdRef.current) {
+        console.warn("⛔ member ignored (stale req)");
+        return;
+      }
+
+      setMember(member ?? null);
+
+      if (!member?.org_id) {
+        console.log("ℹ️ No org found for user");
+        setOrganization(null);
+        setOrgSettings(null);
+        return;
+      }
+
+      console.log("🏢 Fetching organization...");
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("*")
+        .eq("id", member.org_id)
+        .maybeSingle<Organization>();
+
+      console.log("🏢 organization result:", org);
+
+      if (reqId !== requestIdRef.current) {
+        console.warn("⛔ org ignored (stale req)");
+        return;
+      }
+
+      setOrganization(org ?? null);
+
+      console.log("⚙️ Fetching org_settings...");
+      const { data: settings } = await supabase
+        .from("org_settings")
+        .select("org_id, logo_url")
+        .eq("org_id", member.org_id)
+        .maybeSingle<OrgSettings>();
+
+      console.log("⚙️ settings result:", settings);
+
+      if (reqId !== requestIdRef.current) {
+        console.warn("⛔ settings ignored (stale req)");
+        return;
+      }
+
+      setOrgSettings(settings ?? null);
+    } catch (err) {
+      console.error("🔥 loadUserData ERROR:", err);
+    } finally {
+      if (reqId === requestIdRef.current) {
+        console.log("✅ loadUserData END → loading=false");
+        setLoading(false);
+      } else {
+        console.warn("⛔ loadUserData END skipped (stale req)");
+      }
+      console.groupEnd();
+    }
+  };
+
+  /* ===================== AUTH LISTENER ===================== */
+    useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      requestIdRef.current++;
+
+     if (session?.user) {
+    // 🔥 SAME USER → IGNORE
+    if (activeUserIdRef.current === session.user.id) {
+      console.log("🟡 Same user event ignored:", session.user.id);
+      return;
+    }
+
+    console.log("🆕 New user detected → reset state:", session.user.id);
+
+    activeUserIdRef.current = session.user.id;
+
+    // 🧹 ÖNCE TÜM ESKİ VERİLERİ TEMİZLE
+    setUser(session.user);
+    setProfile(null);
+    setMember(null);
+    setOrganization(null);
+    setOrgSettings(null);
+    setLoading(true);
+
+    // 🚀 SONRA YENİ USER DATA YÜKLE
+    loadUserData(session.user.id);
+  }
+
+    });
+
+    return () => data.subscription.unsubscribe();
+  }, [supabase]);
+
+
+  /* ===================== INITIAL SESSION ===================== */
+  useEffect(() => {
+    console.log("🟡 Initial session check");
+
+    const init = async () => {
+      const { data } = await supabase.auth.getSession();
+      const u = data.session?.user ?? null;
+
+      console.log("🧾 getSession result:", u);
+
+      if (!u) {
+        console.log("❌ No session found → loading=false");
+        setLoading(false);
+        return;
+      }
+
+      console.log("✅ Session exists → setUser + loadUserData");
+      setUser(u);
+      await loadUserData(u.id);
+    };
+
+    init();
+  }, [supabase]);
+
+  return (
+    <AppContext.Provider
+      value={{
+        user,
+        profile,
+        member,
+        organization,
+        orgSettings,
+        loading,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
 }
 
 /* ===================== HOOK ===================== */
 
 export function useAppContext() {
   const ctx = useContext(AppContext);
-  if (!ctx) throw new Error("useAppContext must be used inside AppProvider");
+  if (!ctx) {
+    throw new Error("useAppContext must be used inside AppProvider");
+  }
   return ctx;
 }

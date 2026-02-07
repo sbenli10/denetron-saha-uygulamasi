@@ -1,4 +1,3 @@
-// APP/app/admin/settings/tabs/GeneralSettings.tsx
 "use client";
 
 import {
@@ -6,6 +5,8 @@ import {
   Globe,
   Clock,
   Save,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import LogoUploader from "../LogoUploader";
@@ -20,38 +21,52 @@ interface GeneralSettingsProps {
   };
 }
 
+type SaveStatus = "idle" | "success" | "error";
+
 export default function GeneralSettings({ initial }: GeneralSettingsProps) {
   const [orgName, setOrgName] = useState(initial.orgName);
   const [language, setLanguage] = useState(initial.language);
   const [timezone, setTimezone] = useState(initial.timezone);
   const [logoUrl, setLogoUrl] = useState<string | null>(initial.logoUrl);
 
+  const [status, setStatus] = useState<SaveStatus>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    console.log("[GENERAL SETTINGS] initial:", initial);
-  }, [initial]);
+    setStatus("idle");
+    setErrorMessage(null);
+  }, [orgName, language, timezone, logoUrl]);
 
   function handleSave() {
-    startTransition(async () => {
-      console.log("[GENERAL SETTINGS] saving:", {
-        orgName,
-        language,
-        timezone,
-        logoUrl,
-      });
+    setStatus("idle");
+    setErrorMessage(null);
 
-      await updateOrgSettings({
-        org_name: orgName,
-        language,
-        timezone,
-        logo_url: logoUrl,
-      });
+    startTransition(async () => {
+      try {
+        await updateOrgSettings({
+          org_name: orgName,
+          language,
+          timezone,
+          logo_url: logoUrl,
+        });
+
+        setStatus("success");
+      } catch (err: any) {
+        console.error("[GENERAL SETTINGS] save error:", err);
+        setErrorMessage(
+          err?.message ??
+            "Ayarlar kaydedilirken beklenmeyen bir hata oluştu."
+        );
+        setStatus("error");
+      }
     });
   }
 
   return (
     <div className="space-y-10">
+      {/* HEADER */}
       <div className="flex items-center gap-3">
         <Building2 className="text-indigo-500" />
         <h2 className="text-xl font-semibold text-slate-900">
@@ -59,7 +74,8 @@ export default function GeneralSettings({ initial }: GeneralSettingsProps) {
         </h2>
       </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-white/80 backdrop-blur p-6 space-y-6">
+      {/* ORGANIZATION */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 space-y-6">
         <h3 className="font-semibold text-sm text-slate-700">
           Organizasyon Bilgileri
         </h3>
@@ -81,10 +97,7 @@ export default function GeneralSettings({ initial }: GeneralSettingsProps) {
           </label>
 
           <div className="flex items-center gap-6">
-            <LogoUploader
-              value={logoUrl}
-              onChange={setLogoUrl}
-            />
+            <LogoUploader value={logoUrl} onChange={setLogoUrl} />
 
             <div className="text-xs text-slate-500">
               PNG veya JPG<br />
@@ -94,7 +107,8 @@ export default function GeneralSettings({ initial }: GeneralSettingsProps) {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white/80 backdrop-blur p-6 space-y-6">
+      {/* REGIONAL */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 space-y-6">
         <h3 className="font-semibold text-sm text-slate-700">
           Bölgesel Ayarlar
         </h3>
@@ -137,6 +151,22 @@ export default function GeneralSettings({ initial }: GeneralSettingsProps) {
         </div>
       </section>
 
+      {/* FEEDBACK */}
+      {status === "success" && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <CheckCircle2 size={16} />
+          Ayarlar başarıyla kaydedildi.
+        </div>
+      )}
+
+      {status === "error" && errorMessage && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertTriangle size={16} />
+          {errorMessage}
+        </div>
+      )}
+
+      {/* ACTION */}
       <div className="flex justify-end">
         <button
           onClick={handleSave}
@@ -144,7 +174,7 @@ export default function GeneralSettings({ initial }: GeneralSettingsProps) {
           className="flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
         >
           <Save size={16} />
-          Kaydet
+          {isPending ? "Kaydediliyor…" : "Kaydet"}
         </button>
       </div>
     </div>

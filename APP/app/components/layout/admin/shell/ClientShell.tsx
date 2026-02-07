@@ -1,4 +1,3 @@
-// APP/app/components/layout/admin/shell/ClientShell.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -17,7 +16,7 @@ import Topbar from "../topbar/Topbar";
 import CommandPalette from "../command-palette/CommandPalette";
 
 /* ===========================
-   DESKTOP DETECTION (SSR SAFE)
+   DESKTOP DETECTION
 =========================== */
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(false);
@@ -85,81 +84,84 @@ export default function ClientShell({
   }, [mobileOpen, isDesktop]);
 
   return (
-    <SettingsProvider>
-      <ThemeProvider>
-        <EffectsProvider>
-          {/* 🔔 GERÇEK BİLDİRİM BAĞLANTISI */}
-          <NotificationProvider userId={userId} orgId={orgId}>
-            <CommandPaletteProvider
-              openSettings={() => setSettingsOpen(true)}
-              openNotifications={() => {}}
-              logout={() => {}}
-            >
-              <SettingsModal
-                open={settingsOpen}
-                onClose={() => setSettingsOpen(false)}
-              />
+    // 🔥🔥🔥 EN KRİTİK SATIR 🔥🔥🔥
+    <div key={`${userId}:${orgId}`}>
+      <SettingsProvider>
+        <ThemeProvider>
+          <EffectsProvider>
+            <NotificationProvider userId={userId} orgId={orgId}>
+              <CommandPaletteProvider
+                openSettings={() => setSettingsOpen(true)}
+                openNotifications={() => {}}
+                logout={() => {}}
+              >
+                <SettingsModal
+                  open={settingsOpen}
+                  onClose={() => setSettingsOpen(false)}
+                />
 
-              {/* ================= ROOT ================= */}
-              <div className="relative min-h-screen bg-background text-foreground">
-                {!isDesktop && mobileOpen && (
+                <div className="relative min-h-screen bg-background text-foreground">
+                  {!isDesktop && mobileOpen && (
+                    <div
+                      className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+                      onClick={() => setMobileOpen(false)}
+                    />
+                  )}
+
+                  {/* SIDEBAR */}
+                  <aside
+                    className={`
+                      fixed top-0 left-0 z-50 h-dvh
+                      bg-white/90 backdrop-blur-xl
+                      border-r border-border
+                      transition-transform duration-300
+                      ${
+                        isDesktop
+                          ? "translate-x-0"
+                          : mobileOpen
+                          ? "translate-x-0"
+                          : "-translate-x-full"
+                      }
+                    `}
+                    style={{
+                      width: isDesktop ? sidebarWidth : "80vw",
+                      maxWidth: 320,
+                    }}
+                    onMouseEnter={() => isDesktop && setExpanded(true)}
+                    onMouseLeave={() => isDesktop && setExpanded(false)}
+                  >
+                    <Sidebar
+                      expanded={isDesktop ? expanded : true}
+                      closeMobile={() => setMobileOpen(false)}
+                    />
+                  </aside>
+
+                  {/* CONTENT */}
                   <div
-                    className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-                    onClick={() => setMobileOpen(false)}
-                  />
-                )}
+                    className="min-h-screen transition-all"
+                    style={{ marginLeft: isDesktop ? sidebarWidth : 0 }}
+                  >
+                    <Topbar
+                      toggleSidebar={() =>
+                        isDesktop
+                          ? setExpanded((v) => !v)
+                          : setMobileOpen(true)
+                      }
+                      openSettings={() => setSettingsOpen(true)}
+                    />
 
-                {/* ================= SIDEBAR ================= */}
-                <aside
-                  className={`
-                    fixed top-0 left-0 z-50 h-dvh
-                    bg-white/90 backdrop-blur-xl
-                    border-r border-border
-                    transition-transform duration-300
-                    ${isDesktop
-                      ? "translate-x-0"
-                      : mobileOpen
-                      ? "translate-x-0"
-                      : "-translate-x-full"}
-                  `}
-                  style={{
-                    width: isDesktop ? sidebarWidth : "80vw",
-                    maxWidth: 320,
-                  }}
-                  onMouseEnter={() => isDesktop && setExpanded(true)}
-                  onMouseLeave={() => isDesktop && setExpanded(false)}
-                >
-                  <Sidebar
-                    expanded={isDesktop ? expanded : true}
-                    closeMobile={() => setMobileOpen(false)}
-                  />
-                </aside>
+                    <CommandPalette />
 
-                {/* ================= CONTENT ================= */}
-                <div
-                  className="min-h-screen transition-all"
-                  style={{ marginLeft: isDesktop ? sidebarWidth : 0 }}
-                >
-                  <Topbar
-                    toggleSidebar={() =>
-                      isDesktop
-                        ? setExpanded((v) => !v)
-                        : setMobileOpen(true)
-                    }
-                    openSettings={() => setSettingsOpen(true)}
-                  />
-
-                  <CommandPalette />
-
-                  <main className="mx-auto w-full max-w-7xl px-4 py-6">
-                    {children}
-                  </main>
+                    <main className="mx-auto w-full max-w-7xl px-4 py-6">
+                      {children}
+                    </main>
+                  </div>
                 </div>
-              </div>
-            </CommandPaletteProvider>
-          </NotificationProvider>
-        </EffectsProvider>
-      </ThemeProvider>
-    </SettingsProvider>
+              </CommandPaletteProvider>
+            </NotificationProvider>
+          </EffectsProvider>
+        </ThemeProvider>
+      </SettingsProvider>
+    </div>
   );
 }

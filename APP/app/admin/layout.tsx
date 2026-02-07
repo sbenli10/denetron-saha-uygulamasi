@@ -1,4 +1,4 @@
-//APP\app\admin\layout.tsx
+// APP/app/admin/layout.tsx
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import ShellLayout from "@/components/layout/admin/shell/ShellLayout";
@@ -18,7 +18,9 @@ export default async function AdminLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) {
+    redirect("/login");
+  }
 
   const admin = supabaseServiceRoleClient();
 
@@ -29,7 +31,9 @@ export default async function AdminLayout({
     .is("deleted_at", null)
     .maybeSingle();
 
-  if (!member) redirect("/login");
+  if (!member) {
+    redirect("/login");
+  }
 
   let finalRole = member.role ?? null;
 
@@ -47,6 +51,5 @@ export default async function AdminLayout({
     redirect("/operator");
   }
 
-  // ✅ SADECE BURADA UI SHELL
   return <ShellLayout>{children}</ShellLayout>;
 }

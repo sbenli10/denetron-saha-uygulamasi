@@ -23,8 +23,9 @@ export default function NotificationPanel({
   const startY = useRef<number | null>(null);
 
   /* ===================== MOUNT ===================== */
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   /* ===================== ESC + BACK ===================== */
   useEffect(() => {
@@ -61,11 +62,14 @@ export default function NotificationPanel({
     }
   };
 
+  /* ===================== RENDER GUARD ===================== */
+  if (!mounted) return null;
+
   return createPortal(
     <AnimatePresence>
       {open && (
         <>
-          {/* ===== BACKDROP (tap to close) ===== */}
+          {/* BACKDROP */}
           <motion.div
             onClick={onClose}
             initial={{ opacity: 0 }}
@@ -74,7 +78,7 @@ export default function NotificationPanel({
             className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-sm"
           />
 
-          {/* ===== PANEL ===== */}
+          {/* PANEL */}
           <motion.div
             role="dialog"
             aria-label="Bildirim paneli"
@@ -101,12 +105,12 @@ export default function NotificationPanel({
               overflow-hidden
             "
           >
-            {/* ===== Drag Handle (mobile) ===== */}
+            {/* Drag Handle */}
             <div className="sm:hidden flex justify-center py-2">
               <div className="h-1.5 w-12 rounded-full bg-white/20" />
             </div>
 
-            {/* ===== Header ===== */}
+            {/* HEADER */}
             <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
               <div>
                 <div className="text-sm font-semibold text-white">
@@ -141,7 +145,7 @@ export default function NotificationPanel({
               </div>
             </div>
 
-            {/* ===== Content ===== */}
+            {/* CONTENT */}
             <div className="overflow-y-auto px-3 py-3 max-h-[calc(90vh-110px)]">
               {notifications.length === 0 ? (
                 <div className="py-12 text-center text-sm text-white/50">

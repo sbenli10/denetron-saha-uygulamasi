@@ -1,13 +1,13 @@
 // APP/app/admin/settings/page.tsx
 export const dynamic = "force-dynamic";
 
+import { supabaseServerClient } from "@/lib/supabase/server";
 import { getAdminContext } from "@/lib/admin/context";
-import SettingsLayout from "./_components/SettingsLayout";
-import SettingsTabs, {
-  SettingsTabKey,
-} from "./_components/SettingsTabs";
 
-/* TAB CONTENT COMPONENTS */
+import SettingsLayout from "./_components/SettingsLayout";
+import SettingsTabs, { SettingsTabKey } from "./_components/SettingsTabs";
+
+/* TAB CONTENT */
 import GeneralSettings from "./tabs/GeneralSettings";
 import SecuritySettings from "./tabs/SecuritySettings";
 import BillingSettings from "./tabs/BillingSettings";
@@ -22,10 +22,19 @@ interface SettingsPageProps {
 export default async function SettingsPage({
   searchParams,
 }: SettingsPageProps) {
-  const { org, member } = await getAdminContext();
+  /* ================= AUTH USER ================= */
+const supabase = supabaseServerClient();
+const { data } = await supabase.auth.getUser();
 
-  console.log("[SETTINGS PAGE] org_id:", org.id);
-  console.log("[SETTINGS PAGE] org_settings:", org.settings);
+if (!data.user) {
+  throw new Error("Unauthorized");
+}
+
+const user = data.user; // ✅ artık TS için kesin non-null
+
+
+  /* ================= ADMIN CONTEXT ================= */
+  const { org, member } = await getAdminContext();
 
   const isPremium = org.is_premium === true;
   const activeTab: SettingsTabKey = searchParams?.tab ?? "general";
@@ -46,7 +55,12 @@ export default async function SettingsPage({
 
       case "security":
         return (
-          <SecuritySettings isPremium={isPremium} role={member.role} />
+          <SecuritySettings
+            isPremium={isPremium}
+            role={member.role}
+            userId={user.id}       // ✅ Auth user ID
+            orgId={member.org_id}  // ✅ Member org ID
+          />
         );
 
       case "billing":
@@ -71,11 +85,11 @@ export default async function SettingsPage({
   }
 
   return (
-      <SettingsLayout>
-        <div className="space-y-8">
-          <SettingsTabs isPremium={isPremium} />
-          <div>{renderTabContent()}</div>
-        </div>
-      </SettingsLayout>
+    <SettingsLayout>
+      <div className="space-y-8">
+        <SettingsTabs isPremium={isPremium} />
+        <div>{renderTabContent()}</div>
+      </div>
+    </SettingsLayout>
   );
 }
