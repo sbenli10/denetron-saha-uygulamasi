@@ -11,7 +11,7 @@ import {
   RefreshCw,
   Crown,
 } from "lucide-react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { supabaseAuth } from "@/lib/supabase/auth";
 
 import PremiumRequired from "../../_components/PremiumRequired";
 import { cn } from "@/lib/utils";
@@ -24,8 +24,6 @@ import {
   revokeAllSessionsExceptCurrent,
   toggleTrustedDevice,
 } from "@/app/actions/security";
-
-import { Database } from "@/app/lib/supabase.types";
 
 
 /**
@@ -165,7 +163,7 @@ export default function SecuritySettings({
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [devices, setDevices] = useState<DeviceItem[]>([]);
-  const supabase = createClientComponentClient<Database>();
+  const supabase = supabaseAuth();
   const [sessionReady, setSessionReady] = useState(false);
   const [enrolling2FA, setEnrolling2FA] = useState(false);
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -224,102 +222,136 @@ export default function SecuritySettings({
 
 
 async function start2FAEnrollment() {
-  // 🔐 1. Session hazır mı? (UI-level guard)
-  if (!sessionReady) {
-    alert("Oturum henüz hazır değil. Lütfen tekrar deneyin.");
-    return;
-  }
-
-  // 🧱 2. Double click / race guard
+  // UI guard
   if (enrolling2FA) return;
 
-  // 🔥 3. HARD GUARD → MFA için TEK güvenilir kontrol
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+  const supabase = supabaseAuth();
 
-  if (userError || !user) {
-    console.error("AUTH STATE BOZUK:", userError);
-    alert(
-      "Kimlik doğrulama durumu bozuk. Lütfen çıkış yapıp tekrar giriş yapın."
-    );
-    reset2FAState();
+  /* 1️⃣ Session HARD CHECK */
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  if (sessionError || !session) {
+    alert("Oturum bulunamadı. Lütfen çıkış yapıp tekrar giriş yapın.");
     return;
   }
 
-  // (İsteğe bağlı ama DEBUG için çok faydalı)
-  if (process.env.NODE_ENV === "development") {
-    const session = await supabase.auth.getSession();
-    console.log("SESSION:", session);
-    console.log("USER:", user);
+  /* 2️⃣ Mevcut MFA factor’leri kontrol et */
+  const { data: factors, error: factorsError } =
+    await supabase.auth.mfa.listFactors();
+
+  if (factorsError) {
+    console.error("MFA LIST ERROR:", factorsError);
+    alert("2FA durumu okunamadı.");
+    return;
   }
 
-  setEnrolling2FA(true);
+  const existingTotp = factors?.totp?.[0];
 
+  /* ======================================================
+   * 🔁 VAR OLAN (YARIM KALMIŞ) MFA
+   * ====================================================== */
+  if (existingTotp) {
+    try {
+      setEnrolling2FA(true);
+      setFactorId(existingTotp.id);
+
+      const { data: challengeData, error: challengeError } =
+        await supabase.auth.mfa.challenge({
+          factorId: existingTotp.id,
+        });
+
+      if (challengeError || !challengeData) {
+        throw challengeError;
+      }
+
+      setChallengeId(challengeData.id);
+
+      // ⛔ QR yeniden üretilemez
+      setQrCode(null);
+
+      return;
+    } catch (err) {
+      console.error("MFA CHALLENGE ERROR:", err);
+      alert(
+        "Bu kullanıcı için daha önce bozuk bir 2FA kaydı oluşmuş.\n" +
+        "Lütfen çıkış yapıp tekrar giriş yapın."
+      );
+      reset2FAState();
+      return;
+    }
+  }
+
+  /* ======================================================
+   * 🆕 İLK KEZ MFA ENROLL
+   * ====================================================== */
   try {
-    // 4️⃣ ENROLL (TOTP + QR)
+    setEnrolling2FA(true);
+
     const { data: enrollData, error: enrollError } =
       await supabase.auth.mfa.enroll({
         factorType: "totp",
       });
 
     if (enrollError || !enrollData?.totp) {
-      throw enrollError ?? new Error("Enroll başarısız");
+      throw enrollError;
     }
 
     setFactorId(enrollData.id);
     setQrCode(enrollData.totp.qr_code);
 
-    // 5️⃣ CHALLENGE (verify öncesi ZORUNLU)
     const { data: challengeData, error: challengeError } =
       await supabase.auth.mfa.challenge({
         factorId: enrollData.id,
       });
 
     if (challengeError || !challengeData) {
-      throw challengeError ?? new Error("Challenge başarısız");
+      throw challengeError;
     }
 
     setChallengeId(challengeData.id);
   } catch (err) {
     console.error("MFA ENROLL ERROR:", err);
+    alert("2FA başlatılırken hata oluştu.");
     reset2FAState();
-    alert("2FA başlatılırken hata oluştu. Lütfen tekrar deneyin.");
   }
 }
 
 
 
+async function onVerify2FA() {
+  if (!factorId || !challengeId || otp.length !== 6) return;
 
-  async function onVerify2FA() {
-    if (!factorId || !challengeId || otp.length !== 6) return;
+  setVerifying(true);
 
-    setVerifying(true);
-    try {
-      const { error } = await supabase.auth.mfa.verify({
-        factorId,
-        challengeId,
-        code: otp,
-      });
+  try {
+    const supabase = supabaseAuth();
 
-      if (error) throw error;
+    const { error } = await supabase.auth.mfa.verify({
+      factorId,
+      challengeId,
+      code: otp,
+    });
 
-      // ✅ BAŞARILI
-      setTwoFAEnabled(true);
-      reset2FAState();
-    } catch {
-      // ❌ HATALI → factor’ü temizle
-      await supabase.auth.mfa.unenroll({ factorId });
-      reset2FAState();
-    } finally {
-      setVerifying(false);
-    }
+    if (error) throw error;
+
+    setTwoFAEnabled(true);
+    reset2FAState();
+  } catch (err) {
+    console.error("VERIFY ERROR:", err);
+
+    // ❗ FAIL → FACTOR SİL
+    const supabase = supabaseAuth();
+    await supabase.auth.mfa.unenroll({ factorId });
+
+    reset2FAState();
+    alert("Kod doğrulanamadı. Lütfen tekrar deneyin.");
+  } finally {
+    setVerifying(false);
   }
-
-
-
-
+}
 
 
   /* ================= FETCH ================= */

@@ -11,7 +11,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/* TAB TYPES */
+/* ================================
+   TYPES
+================================ */
 export type SettingsTabKey =
   | "general"
   | "security"
@@ -22,11 +24,13 @@ interface SettingsTabsProps {
   isPremium: boolean;
 }
 
-/* TAB CONFIG */
+/* ================================
+   CONFIG
+================================ */
 const TABS: {
   key: SettingsTabKey;
   label: string;
-  icon: any;
+  icon: React.ElementType;
   premium?: boolean;
 }[] = [
   {
@@ -53,6 +57,9 @@ const TABS: {
   },
 ];
 
+/* ================================
+   COMPONENT
+================================ */
 export default function SettingsTabs({
   isPremium,
 }: SettingsTabsProps) {
@@ -61,36 +68,35 @@ export default function SettingsTabs({
     (searchParams.get("tab") as SettingsTabKey) ?? "general";
 
   return (
-    <div
+    <nav
+      aria-label="Ayar sekmeleri"
       className="
-        flex gap-2 overflow-x-auto
+        flex gap-1 overflow-x-auto
         rounded-2xl border border-border
-        bg-background/40
-        p-2
+        bg-muted/30 p-1
       "
     >
       {TABS.map((tab) => {
         const isActive = activeTab === tab.key;
         const locked = tab.premium && !isPremium;
+        const Icon = tab.icon;
 
         return (
           <Link
             key={tab.key}
             href={`/admin/settings?tab=${tab.key}`}
+            aria-current={isActive ? "page" : undefined}
             className={cn(
-              `
-              relative flex items-center gap-2
-              px-4 py-2 rounded-xl
-              text-sm font-medium
-              transition-all whitespace-nowrap
-              `,
+              "group relative flex items-center gap-2",
+              "rounded-xl px-4 py-2 text-sm font-medium",
+              "transition-all whitespace-nowrap",
               isActive
-                ? "bg-primary text-primary-foreground shadow"
-                : "text-foreground/70 hover:bg-accent",
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-background/60",
               locked && "opacity-60"
             )}
           >
-            <tab.icon size={16} />
+            <Icon size={16} />
 
             <span>{tab.label}</span>
 
@@ -98,18 +104,33 @@ export default function SettingsTabs({
             {locked && (
               <span
                 className="
-                  ml-1 flex items-center gap-1
-                  text-[10px]
-                  text-amber-500
+                  ml-1 inline-flex items-center gap-1
+                  rounded-full border border-amber-300/40
+                  bg-amber-100/40
+                  px-2 py-0.5
+                  text-[10px] font-semibold
+                  text-amber-700
                 "
               >
-                <Lock size={12} />
+                <Lock size={10} />
                 Premium
               </span>
+            )}
+
+            {/* Active indicator */}
+            {isActive && (
+              <span
+                aria-hidden
+                className="
+                  absolute inset-x-2 -bottom-1
+                  h-0.5 rounded-full
+                  bg-primary
+                "
+              />
             )}
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }

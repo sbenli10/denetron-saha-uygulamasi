@@ -2,42 +2,82 @@
 
 import { supabaseServerClient } from "@/lib/supabase/server";
 import { getAdminContext } from "@/lib/admin/context";
+import { revalidatePath } from "next/cache";
 
-export async function updateOrgSettings(input: {
+interface UpdateOrgSettingsInput {
   org_name: string;
   language: string;
   timezone: string;
   logo_url: string | null;
-}) {
+}
+
+export async function updateOrgSettings(input: UpdateOrgSettingsInput) {
   console.log("[ORG SETTINGS] update started:", input);
 
   const { member } = await getAdminContext();
-  const supabase = supabaseServerClient();
 
+  if (!member || member.role !== "admin") {
+    throw new Error("Bu işlem için yetkiniz yok.");
+  }
+
+  const supabase = supabaseServerClient();
+  const orgId = member.org_id;
+
+  if (!input.org_name || input.org_name.trim().length < 2) {
+    throw new Error("Organizasyon adı en az 2 karakter olmalıdır.");
+  }
+
+  /* =========================
+     ORG SETTINGS (UPSERT)
+  ========================= */
   const { error: settingsErr } = await supabase
     .from("org_settings")
-    .update({
-      language: input.language,
-      timezone: input.timezone,
-      logo_url: input.logo_url,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("org_id", member.org_id);
+    .upsert(
+      {
+        org_id: orgId,
+        language: input.language,
+        timezone: input.timezone,
+        logo_url: input.logo_url,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "org_id" }
+    );
 
   if (settingsErr) {
-    console.error("[ORG SETTINGS] org_settings update error:", settingsErr);
-    throw settingsErr;
+    console.error("[ORG SETTINGS] org_settings error:", settingsErr);
+    throw new Error("Organizasyon ayarları güncellenemedi.");
   }
 
-  const { error: orgErr } = await supabase
+  /* =========================
+     ORGANIZATION NAME (TEK VE DOĞRU)
+  ========================= */
+  const {
+    data: updatedOrg,
+    error: updateOrgErr,
+  } = await supabase
     .from("organizations")
-    .update({ name: input.org_name })
-    .eq("id", member.org_id);
+    .update({
+      name: input.org_name.trim(),
+    })
+    .eq("id", orgId)
+    .select("id, name")
+    .single();
 
-  if (orgErr) {
-    console.error("[ORG SETTINGS] organizations update error:", orgErr);
-    throw orgErr;
+  if (updateOrgErr || !updatedOrg) {
+    console.error(
+      "[ORG SETTINGS] organizations error:",
+      updateOrgErr
+    );
+    throw new Error("Organizasyon adı güncellenemedi.");
   }
 
-  console.log("[ORG SETTINGS] SUCCESS for org:", member.org_id);
+  console.log(
+    "[ORG SETTINGS] organization updated:",
+    updatedOrg
+  );
+
+  // 🔄 Server Component cache invalidate
+  revalidatePath("/admin/settings");
+
+  return { success: true };
 }

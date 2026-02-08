@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, X, Crown } from "lucide-react";
+import { Check, X, Crown, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* ================================
@@ -40,6 +40,7 @@ const PLANS: Record<
   PlanKey,
   {
     title: string;
+    badge?: string;
     values: PlanValues;
   }
 > = {
@@ -59,6 +60,7 @@ const PLANS: Record<
 
   trial: {
     title: "Trial",
+    badge: "Önerilen",
     values: {
       inspections: true,
       mobile: true,
@@ -73,6 +75,7 @@ const PLANS: Record<
 
   premium: {
     title: "Premium",
+    badge: "En Güçlü",
     values: {
       inspections: true,
       mobile: true,
@@ -92,92 +95,86 @@ const PLANS: Record<
 
 export default function PlanComparison() {
   return (
-    <div className="space-y-8">
-
+    <div className="space-y-10">
       {/* Header */}
-      <div>
-        <h3 className="text-lg font-semibold">
+      <div className="max-w-2xl">
+        <h3 className="text-xl font-semibold tracking-tight">
           Plan Karşılaştırması
         </h3>
-        <p className="text-sm text-slate-600 mt-1">
-          Hangi planın size uygun olduğunu karşılaştırın.
+        <p className="text-sm text-muted-foreground mt-1">
+          Özellikleri karşılaştırarak işletmeniz için en uygun planı seçin.
         </p>
       </div>
 
-      {/* Desktop Table */}
-      <div className="hidden md:block overflow-hidden rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-xl">
+      {/* ================= Desktop Table ================= */}
+      <div className="hidden md:block overflow-hidden rounded-2xl border border-border bg-background">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50">
+          <thead className="bg-muted/40">
             <tr>
-              <th className="text-left px-6 py-4">Özellik</th>
-              <th className="px-6 py-4">Free</th>
-              <th className="px-6 py-4">
-                <div className="flex items-center justify-center gap-1">
-                  <Crown size={14} className="text-indigo-500" />
-                  Trial
-                </div>
+              <th className="text-left px-6 py-4 font-medium">
+                Özellikler
               </th>
-              <th className="px-6 py-4">Premium</th>
+
+              {(Object.keys(PLANS) as PlanKey[]).map((plan) => (
+                <th key={plan} className="px-6 py-4 text-center">
+                  <PlanHeader plan={plan} />
+                </th>
+              ))}
             </tr>
           </thead>
 
           <tbody>
-            {FEATURES.map((feature) => (
+            {FEATURES.map((feature, i) => (
               <tr
                 key={feature.key}
-                className="border-t border-slate-200"
+                className={cn(
+                  "border-t border-border",
+                  i % 2 === 0 && "bg-muted/20"
+                )}
               >
-                <td className="px-6 py-4 text-slate-700">
+                <td className="px-6 py-4 text-muted-foreground">
                   {feature.label}
                 </td>
 
-                {(Object.keys(PLANS) as PlanKey[]).map(
-                  (plan) => (
-                    <td
-                      key={plan}
-                      className="px-6 py-4 text-center"
-                    >
-                      {renderValue(
-                        PLANS[plan].values[feature.key]
-                      )}
-                    </td>
-                  )
-                )}
+                {(Object.keys(PLANS) as PlanKey[]).map((plan) => (
+                  <td key={plan} className="px-6 py-4 text-center">
+                    {renderValue(
+                      PLANS[plan].values[feature.key],
+                      plan
+                    )}
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {/* Mobile Cards */}
+      {/* ================= Mobile Cards ================= */}
       <div className="md:hidden space-y-6">
         {(Object.keys(PLANS) as PlanKey[]).map((plan) => (
           <div
             key={plan}
             className={cn(
-              "rounded-2xl border p-5 bg-white/80 backdrop-blur-xl",
+              "rounded-2xl border border-border bg-background p-5",
               plan === "trial" &&
-                "border-indigo-400 shadow-[0_0_0_2px_rgba(99,102,241,0.15)]"
+                "ring-2 ring-indigo-500/20 border-indigo-400"
             )}
           >
-            <h4 className="font-semibold mb-4 flex items-center gap-2">
-              {plan === "trial" && (
-                <Crown size={16} className="text-indigo-500" />
-              )}
-              {PLANS[plan].title}
-            </h4>
+            <PlanHeader plan={plan} mobile />
 
-            <ul className="space-y-2 text-sm">
+            <ul className="mt-4 space-y-3 text-sm">
               {FEATURES.map((feature) => (
                 <li
                   key={feature.key}
-                  className="flex items-center justify-between"
+                  className="flex items-center justify-between gap-3"
                 >
-                  <span className="text-slate-600">
+                  <span className="text-muted-foreground">
                     {feature.label}
                   </span>
                   {renderValue(
-                    PLANS[plan].values[feature.key]
+                    PLANS[plan].values[feature.key],
+                    plan
                   )}
                 </li>
               ))}
@@ -190,21 +187,81 @@ export default function PlanComparison() {
 }
 
 /* ================================
-   VALUE RENDERER
+   SUB COMPONENTS
 ================================ */
 
-function renderValue(value: boolean | string) {
-  if (value === true) {
-    return <Check className="text-emerald-500" size={16} />;
-  }
-
-  if (value === false) {
-    return <X className="text-slate-300" size={16} />;
-  }
+function PlanHeader({
+  plan,
+  mobile = false,
+}: {
+  plan: PlanKey;
+  mobile?: boolean;
+}) {
+  const data = PLANS[plan];
 
   return (
-    <span className="text-xs font-medium text-slate-700">
-      {value}
-    </span>
+    <div
+      className={cn(
+        "flex min-h-[48px] flex-col items-center justify-center gap-1",
+        mobile && "items-start"
+      )}
+    >
+      <div className="flex items-center gap-1.5 font-semibold">
+        {plan === "trial" && (
+          <Sparkles size={14} className="text-indigo-500" />
+        )}
+        {plan === "premium" && (
+          <Crown size={14} className="text-amber-500" />
+        )}
+        {data.title}
+      </div>
+
+      {data.badge && (
+        <span
+          className="
+            rounded-full bg-indigo-500/10
+            px-2 py-0.5 text-[11px]
+            font-medium text-indigo-600
+          "
+        >
+          {data.badge}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function renderValue(
+  value: boolean | string,
+  plan: PlanKey
+) {
+  return (
+    <div className="flex h-6 items-center justify-center">
+      {value === true && (
+        <Check
+          size={16}
+          className={cn(
+            plan === "premium"
+              ? "text-amber-500"
+              : plan === "trial"
+              ? "text-indigo-500"
+              : "text-emerald-500"
+          )}
+        />
+      )}
+
+      {value === false && (
+        <X
+          size={16}
+          className="text-muted-foreground/40"
+        />
+      )}
+
+      {typeof value === "string" && (
+        <span className="text-xs font-medium text-foreground">
+          {value}
+        </span>
+      )}
+    </div>
   );
 }

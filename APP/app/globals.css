@@ -302,3 +302,20 @@ html[data-theme="dark"] .border-gray-200,
 html[data-theme="dark"] .border-gray-300 {
   border-color: var(--border) !important;
 }
+
+
+:root {
+  /* Premium colors – Light */
+  --premium-bg: linear-gradient(135deg, #fef3c7, #fde68a, #facc15);
+  --premium-text: #78350f;
+  --premium-border: rgba(250, 204, 21, 0.6);
+  --premium-glow: rgba(250, 204, 21, 0.35);
+}
+
+.dark {
+  /* Premium colors – Dark */
+  --premium-bg: linear-gradient(135deg, #3f2e00, #6b4e00, #a16207);
+  --premium-text: #fde68a;
+  --premium-border: rgba(252, 211, 77, 0.35);
+  --premium-glow: rgba(252, 211, 77, 0.45);
+}

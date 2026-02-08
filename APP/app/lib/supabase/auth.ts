@@ -1,16 +1,25 @@
-//APP\app\lib\supabase\auth.ts
+// APP/app/lib/supabase/auth.ts
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import type { Database } from "@/app/lib/supabase.types";
 
-let client: ReturnType<typeof createBrowserClient> | null = null;
+let supabase: ReturnType<typeof createBrowserClient<Database>> | null = null;
 
 export function supabaseAuth() {
-  if (!client) {
-    client = createBrowserClient(
+  if (!supabase) {
+    supabase = createBrowserClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: false,
+        },
+      }
     );
   }
-  return client;
+
+  return supabase;
 }
