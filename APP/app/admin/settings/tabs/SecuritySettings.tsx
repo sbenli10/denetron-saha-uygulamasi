@@ -43,11 +43,36 @@ export interface SecuritySettingsProps {
  * Sonraki adım: Supabase auth/session + device fingerprint/agent log tablosuna bağlanacak.
  */
 type SessionItem = {
-  id: string;            // device_sessions.id
-  sessionId: string;     // refresh_token
-  label: string;         // "Chrome · Windows"
-  isCurrent: boolean;    // is_current
+  id: string;
+  sessionId: string;
+  deviceHash: string;   // ✅ EKLE
+  agent: string;
+  isCurrent: boolean;
   lastSeenAt: string;
+};
+
+type RawSessionRow = {
+  id: string;
+  session_id: string;
+  device_hash: string;
+  agent: string;
+  platform: string;
+  ip: string;
+  is_current: boolean;
+  last_seen_at: string;
+};
+
+
+type GroupedSession = {
+  deviceHash: string;
+  label: string;
+  lastSeenAt: string;
+  sessionCount: number;
+  isCurrentDevice: boolean;
+  sessions: {
+    sessionId: string;
+    isCurrent: boolean;
+  }[];
 };
 
 
@@ -75,6 +100,52 @@ function formatTimeTR(iso: string) {
     return iso;
   }
 }
+
+function groupSessionsByDevice(
+  rows: RawSessionRow[]
+): GroupedSession[] {
+  const map = new Map<string, GroupedSession>();
+
+  for (const row of rows) {
+    const key = row.device_hash;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        deviceHash: key,
+        label: parseDevice(row.agent).label,
+        isCurrentDevice: false,
+        sessionCount: 0,
+        lastSeenAt: row.last_seen_at,
+        sessions: [],
+      });
+    }
+
+    const group = map.get(key)!;
+
+    // ✅ DOĞRU SHAPE
+    group.sessions.push({
+      sessionId: row.session_id,
+      isCurrent: row.is_current === true,
+    });
+
+    group.sessionCount += 1;
+
+    if (row.is_current) {
+      group.isCurrentDevice = true;
+    }
+
+    if (new Date(row.last_seen_at) > new Date(group.lastSeenAt)) {
+      group.lastSeenAt = row.last_seen_at;
+    }
+  }
+
+  return Array.from(map.values()).sort(
+    (a, b) =>
+      new Date(b.lastSeenAt).getTime() -
+      new Date(a.lastSeenAt).getTime()
+  );
+}
+
 
 function RoleGate({
   role,
@@ -147,6 +218,15 @@ function SectionShell({
   );
 }
 
+async function revokeAllForDevice(
+  sessions: { sessionId: string; isCurrent: boolean }[]
+) {
+  for (const s of sessions) {
+    if (!s.isCurrent) {
+      await revokeSession(s.sessionId);
+    }
+  }
+}
 
 
 /* ================= COMPONENT ================= */
@@ -171,7 +251,19 @@ export default function SecuritySettings({
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [otp, setOtp] = useState("");
   const [verifying, setVerifying] = useState(false);
-  
+  const groupedSessions = groupSessionsByDevice(
+    sessions.map((s) => ({
+      id: s.id,
+      session_id: s.sessionId,
+      device_hash: s.deviceHash,   // ✅ GERÇEK HASH
+      agent: s.agent,
+      platform: "",
+      ip: "",
+      is_current: s.isCurrent,
+      last_seen_at: s.lastSeenAt,
+    }))
+  );
+
   function reset2FAState() {
   setEnrolling2FA(false);
   setQrCode(null);
@@ -222,74 +314,58 @@ export default function SecuritySettings({
 
 
 async function start2FAEnrollment() {
-  // UI guard
-  if (enrolling2FA) return;
-
   const supabase = supabaseAuth();
 
-  /* 1️⃣ Session HARD CHECK */
-  const {
-    data: { session },
-    error: sessionError,
-  } = await supabase.auth.getSession();
-
-  if (sessionError || !session) {
-    alert("Oturum bulunamadı. Lütfen çıkış yapıp tekrar giriş yapın.");
+  // 0️⃣ Session HARD CHECK
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session) {
+    alert("Oturum bulunamadı. Lütfen tekrar giriş yapın.");
     return;
   }
 
-  /* 2️⃣ Mevcut MFA factor’leri kontrol et */
-  const { data: factors, error: factorsError } =
+  // 1️⃣ Mevcut factor'leri al
+  const { data: factors, error: factorError } =
     await supabase.auth.mfa.listFactors();
 
-  if (factorsError) {
-    console.error("MFA LIST ERROR:", factorsError);
-    alert("2FA durumu okunamadı.");
+  if (factorError) {
+    alert("2FA durumu alınamadı.");
     return;
   }
 
   const existingTotp = factors?.totp?.[0];
 
-  /* ======================================================
-   * 🔁 VAR OLAN (YARIM KALMIŞ) MFA
-   * ====================================================== */
+  // 2️⃣ YARIM KALMIŞ ENROLL VARSA → DEVAM ET
   if (existingTotp) {
-    try {
-      setEnrolling2FA(true);
-      setFactorId(existingTotp.id);
+    const confirmResume = confirm(
+      "Daha önce başlatılmış bir 2FA doğrulaması var. Devam etmek ister misiniz?"
+    );
 
-      const { data: challengeData, error: challengeError } =
+    if (!confirmResume) {
+      // 🔥 KULLANICI SIFIRLAMAK İSTİYOR
+      await supabase.auth.mfa.unenroll({
+        factorId: existingTotp.id,
+      });
+    } else {
+      // ✅ DEVAM
+      const { data: challengeData, error } =
         await supabase.auth.mfa.challenge({
           factorId: existingTotp.id,
         });
 
-      if (challengeError || !challengeData) {
-        throw challengeError;
+      if (error || !challengeData) {
+        alert("Mevcut doğrulama başlatılamadı.");
+        return;
       }
 
+      setFactorId(existingTotp.id);
       setChallengeId(challengeData.id);
-
-      // ⛔ QR yeniden üretilemez
-      setQrCode(null);
-
-      return;
-    } catch (err) {
-      console.error("MFA CHALLENGE ERROR:", err);
-      alert(
-        "Bu kullanıcı için daha önce bozuk bir 2FA kaydı oluşmuş.\n" +
-        "Lütfen çıkış yapıp tekrar giriş yapın."
-      );
-      reset2FAState();
+      setEnrolling2FA(true);
       return;
     }
   }
 
-  /* ======================================================
-   * 🆕 İLK KEZ MFA ENROLL
-   * ====================================================== */
+  // 3️⃣ YENİ ENROLL
   try {
-    setEnrolling2FA(true);
-
     const { data: enrollData, error: enrollError } =
       await supabase.auth.mfa.enroll({
         factorType: "totp",
@@ -312,12 +388,13 @@ async function start2FAEnrollment() {
     }
 
     setChallengeId(challengeData.id);
+    setEnrolling2FA(true);
   } catch (err) {
     console.error("MFA ENROLL ERROR:", err);
     alert("2FA başlatılırken hata oluştu.");
-    reset2FAState();
   }
 }
+
 
 
 
@@ -366,11 +443,13 @@ async function onVerify2FA() {
       sessionRows.map((r: any): SessionItem => ({
         id: r.id,
         sessionId: r.session_id,
-        label: parseDevice(r.agent).label,
+        deviceHash: r.device_hash,   // 🔥 KRİTİK
+        agent: r.agent,
         isCurrent: r.is_current === true,
         lastSeenAt: r.last_seen_at,
       }))
     );
+
 
     setDevices(
       deviceRows.map((d: any): DeviceItem => ({
@@ -441,11 +520,11 @@ async function onVerify2FA() {
         </button>
       </div>
 
-     {/* 2FA */}
+     {/* ================= 2FA ================= */}
       <SectionShell
         icon={KeyRound}
         title="İki Aşamalı Doğrulama (2FA)"
-        description="Ekstra güvenlik katmanı"
+        description="Hesabınız için ek bir güvenlik katmanı"
         right={
           !isPremium && (
             <span className="inline-flex items-center gap-1 text-xs">
@@ -458,24 +537,42 @@ async function onVerify2FA() {
           <PremiumRequired role={role} />
         ) : (
           <>
-            {/* 2FA AKTİF DEĞİL */}
+            {/* ===== AÇIKLAMA (HER ZAMAN GÖRÜNÜR) ===== */}
+            <p className="text-sm text-foreground/60 leading-relaxed">
+              2FA etkinleştirildiğinde, hesabınıza giriş yaparken şifrenize ek olarak
+              telefonunuzdaki doğrulama uygulamasından üretilen 6 haneli bir kod istenir.
+              <br />
+              <span className="text-xs text-foreground/50">
+                Bu sayede şifreniz ele geçirilse bile hesabınız korunur.
+              </span>
+            </p>
+
+            {/* ===== 2FA AKTİF DEĞİL ===== */}
             {!twoFAEnabled && !enrolling2FA && (
-              <button
-                disabled={!sessionReady}
-                onClick={start2FAEnrollment}
-                className="
-                  h-10 px-4 rounded-xl
-                  bg-primary text-primary-foreground
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                "
-              >
-                2FA’yı Etkinleştir
-              </button>
+              <div className="pt-3">
+                <button
+                  disabled={!sessionReady}
+                  onClick={start2FAEnrollment}
+                  className="
+                    h-10 px-4 rounded-xl
+                    bg-primary text-primary-foreground
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                  "
+                >
+                  2FA’yı Etkinleştir
+                </button>
+
+                {!sessionReady && (
+                  <p className="mt-2 text-xs text-foreground/50">
+                    Oturum doğrulanıyor, lütfen bekleyin…
+                  </p>
+                )}
+              </div>
             )}
 
-            {/* 2FA ENROLL FLOW */}
+            {/* ===== 2FA ENROLL (QR + KOD) ===== */}
             {enrolling2FA && factorId && challengeId && (
-              <div className="space-y-4 mt-4">
+              <div className="space-y-4 mt-6">
                 {qrCode && (
                   <div className="flex flex-col items-center gap-2">
                     <img
@@ -484,7 +581,7 @@ async function onVerify2FA() {
                       className="w-40 h-40"
                     />
                     <p className="text-xs text-foreground/60 text-center">
-                      Authenticator uygulamasıyla QR kodu okut
+                      Google Authenticator veya benzeri bir uygulama ile QR kodu okutun
                     </p>
                   </div>
                 )}
@@ -492,42 +589,53 @@ async function onVerify2FA() {
                 <input
                   value={otp}
                   onChange={(e) => setOtp(e.target.value)}
-                  placeholder="6 haneli kod"
+                  placeholder="6 haneli doğrulama kodu"
                   inputMode="numeric"
                   maxLength={6}
                   className="h-10 w-full rounded-xl border px-3"
                 />
 
-                <button
-                  onClick={onVerify2FA}
-                  disabled={verifying || otp.length !== 6}
-                  className="
-                    h-10 px-4 rounded-xl
-                    bg-emerald-600 text-white
-                    disabled:opacity-50
-                  "
-                >
-                  {verifying ? "Doğrulanıyor..." : "Doğrula"}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={onVerify2FA}
+                    disabled={verifying || otp.length !== 6}
+                    className="
+                      flex-1 h-10 rounded-xl
+                      bg-emerald-600 text-white
+                      disabled:opacity-50
+                    "
+                  >
+                    {verifying ? "Doğrulanıyor…" : "Doğrula"}
+                  </button>
 
-                <button
-                  onClick={async () => {
-                    if (factorId) {
-                      await supabase.auth.mfa.unenroll({ factorId });
-                    }
-                    reset2FAState();
-                  }}
-                  className="h-10 px-4 rounded-xl border text-sm"
-                >
-                  Vazgeç
-                </button>
+                  <button
+                    onClick={async () => {
+                      if (factorId) {
+                        await supabase.auth.mfa.unenroll({ factorId });
+                      }
+                      reset2FAState();
+                    }}
+                    className="h-10 px-4 rounded-xl border text-sm"
+                  >
+                    Vazgeç
+                  </button>
+                </div>
+
+                <p className="text-xs text-foreground/50 text-center">
+                  Doğrulama tamamlanmadan 2FA aktif hale gelmez.
+                </p>
               </div>
             )}
 
-            {/* 2FA AKTİF */}
+            {/* ===== 2FA AKTİF ===== */}
             {twoFAEnabled && (
-              <div className="text-sm text-emerald-600 font-medium">
-                2FA aktif
+              <div className="mt-4 space-y-1">
+                <div className="text-sm text-emerald-600 font-medium">
+                  2FA aktif
+                </div>
+                <p className="text-xs text-foreground/60">
+                  Hesabınıza girişlerde artık doğrulama kodu istenecektir.
+                </p>
               </div>
             )}
           </>
@@ -537,87 +645,91 @@ async function onVerify2FA() {
 
 
       {/* Sessions */}
-      <SectionShell
-        icon={Monitor}
-        title="Aktif Oturumlar"
-        description="Bu cihaz hariç tüm oturumlar kapatılır"
-        right={
-          <button
-            onClick={onRevokeOthers}
-            className="h-10 px-4 rounded-xl border text-sm"
-          >
-            <LogOut className="h-4 w-4 inline mr-1" />
-            Diğerlerini Kapat
-          </button>
-        }
-      >
-        {sessions.length === 0 ? (
-          <div className="text-sm text-foreground/60">
-            Oturum yok
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {sessions.map((s) => (
-              <div
-                key={s.id}
-                className="
-                  rounded-xl border border-border
-                  bg-background/30
-                  p-4
-                  flex flex-col sm:flex-row
-                  sm:items-center sm:justify-between
-                  gap-3
-                "
-              >
-                {/* SOL TARAF */}
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">
-                      {s.label}
-                    </span>
+<SectionShell
+  icon={Monitor}
+  title="Aktif Oturumlar"
+  description="Bu cihaz hariç tüm oturumlar kapatılır"
+  right={
+    <button
+      onClick={onRevokeOthers}
+      className="h-10 px-4 rounded-xl border text-sm"
+    >
+      <LogOut className="h-4 w-4 inline mr-1" />
+      Diğerlerini Kapat
+    </button>
+  }
+>
+  {groupedSessions.length === 0 ? (
+    <div className="text-sm text-foreground/60">
+      Oturum yok
+    </div>
+  ) : (
+    <div className="space-y-3">
+      {groupedSessions.map((d) => (
+        <div
+          key={d.deviceHash}
+          className="
+            rounded-xl border border-border
+            bg-background/30
+            p-4
+            flex flex-col gap-2
+          "
+        >
+          {/* ÜST SATIR */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">
+                  {d.label}
+                </span>
 
-                    {s.isCurrent && (
-                      <span
-                        className="
-                          text-[11px] px-2 py-0.5 rounded-full
-                          bg-emerald-500/15 text-emerald-600
-                          border border-emerald-500/30
-                        "
-                      >
-                        Bu cihaz
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="text-xs text-foreground/60">
-                    Son aktivite: {formatTimeTR(s.lastSeenAt)}
-                  </div>
-                </div>
-
-                {/* SAĞ TARAF */}
-                {!s.isCurrent && (
-                  <button
-                    onClick={async () => {
-                      await revokeSession(s.sessionId);
-                      await loadData();
-                    }}
+                {d.isCurrentDevice && (
+                  <span
                     className="
-                      h-9 px-4 rounded-xl
-                      border border-border
-                      text-sm font-medium
-                      hover:bg-accent
-                      transition
-                      self-start sm:self-auto
+                      text-[11px] px-2 py-0.5 rounded-full
+                      bg-emerald-500/15 text-emerald-600
+                      border border-emerald-500/30
                     "
                   >
-                    Oturumu Kapat
-                  </button>
+                    Bu cihaz
+                  </span>
                 )}
               </div>
-            ))}
+
+              <div className="text-xs text-foreground/60">
+                Son aktivite: {formatTimeTR(d.lastSeenAt)}
+              </div>
+
+              <div className="text-xs text-foreground/60">
+                Aktif oturum: {d.sessionCount}
+              </div>
+            </div>
+
+            {/* AKSİYON */}
+            {!d.isCurrentDevice && (
+              <button
+                onClick={async () => {
+                  await revokeAllForDevice(d.sessions);
+                  await loadData();
+                }}
+                className="
+                  h-9 px-4 rounded-xl
+                  border border-border
+                  text-sm font-medium
+                  hover:bg-accent
+                  transition
+                "
+              >
+                Tümünü kapat
+              </button>
+            )}
           </div>
-        )}
-      </SectionShell>
+        </div>
+      ))}
+    </div>
+  )}
+</SectionShell>
+
 
       {/* Devices */}
       <SectionShell

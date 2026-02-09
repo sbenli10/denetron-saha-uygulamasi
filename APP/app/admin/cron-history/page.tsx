@@ -1,106 +1,66 @@
-// APP/app/admin/cron-history/page.tsx
 export const dynamic = "force-dynamic";
 
-import { loadCronHistory } from "./load";
-export default async function CronHistoryPage() {
-  const rows = await loadCronHistory();
+import { loadCronHistoryDetailed } from "../cron-history/loadCronHistoryDetailed";
+import { loadNextSchedules } from "../cron-history/loadNextSchedules";
+import CronHistoryExpandable from "app/admin/cron-history/CronHistoryExpandable";
+
+function formatTR(iso: string) {
+  try {
+    return new Date(iso).toLocaleString("tr-TR");
+  } catch {
+    return iso;
+  }
+}
+
+export default async function CronPage() {
+  const runs = await loadCronHistoryDetailed();
+  const next = await loadNextSchedules();
 
   return (
- 
-      <div className="max-w-6xl mx-auto py-12 space-y-8">
-        {/* HEADER */}
-        <div>
-          <h1 className="text-3xl font-semibold text-slate-900">
-            Otomatik Görev Geçmişi
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Zamanlanmış görevlerin cron tarafından ne zaman ve nasıl çalıştığını görüntüleyin.
-          </p>
-        </div>
-
-        {/* TABLE */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="px-5 py-3 text-left font-medium text-slate-600">
-                  Çalışma Zamanı
-                </th>
-                <th className="px-5 py-3 text-left font-medium text-slate-600">
-                  Şablon
-                </th>
-                <th className="px-5 py-3 text-center font-medium text-slate-600">
-                  Oluşan Görev
-                </th>
-                <th className="px-5 py-3 text-left font-medium text-slate-600">
-                  Durum
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-            {rows.map((r) => (
-              <tr
-                key={r.id}
-                className="border-t border-slate-100 hover:bg-slate-50 transition"
-              >
-                {/* TIME */}
-                <td className="px-5 py-4 text-slate-700">
-                  {new Date(r.ran_at).toLocaleString("tr-TR")}
-                </td>
-
-                {/* TEMPLATE */}
-                <td className="px-5 py-4 font-medium text-slate-800">
-                  {r.template_name}
-                </td>
-
-                {/* COUNT */}
-                <td className="px-5 py-4 text-center">
-                  <span className="inline-flex px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-100">
-                    {r.created_tasks}
-                  </span>
-                </td>
-
-                {/* STATUS */}
-                <td className="px-5 py-4">
-                  {r.status === "success" && (
-                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-                      Başarılı
-                    </span>
-                  )}
-
-                  {r.status === "skipped" && (
-                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
-                      Yeni görev oluşturulmadı
-                    </span>
-                  )}
-
-                  {r.status === "failed" && (
-                    <div className="space-y-1">
-                      <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-                        Hata
-                      </span>
-                      {r.error && (
-                        <div className="text-xs text-red-500 max-w-sm">
-                          {r.error}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-5 py-10 text-center text-slate-400">
-                  Henüz cron çalıştırılmamış.
-                </td>
-              </tr>
-            )}
-          </tbody>
-          </table>
-        </div>
+    <div className="max-w-6xl mx-auto py-12 space-y-8">
+      <div>
+        <h1 className="text-3xl font-semibold text-slate-900">
+          Otomatik Denetimler
+        </h1>
+        <p className="text-sm text-slate-500 mt-1">
+          Zamanlanmış denetimlerin operatör bazlı durumunu görüntüleyin.
+        </p>
       </div>
+
+      {/* NEXT RUNS */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="font-semibold text-slate-900 mb-3">
+          Yaklaşan Çalışmalar
+        </div>
+
+        {next.length === 0 ? (
+          <div className="text-sm text-slate-500">Aktif zamanlama yok.</div>
+        ) : (
+          <div className="space-y-2">
+            {next.map((s) => (
+              <div
+                key={s.id}
+                className="flex items-center justify-between rounded-xl border border-slate-100 p-3"
+              >
+                <div>
+                  <div className="text-sm font-medium text-slate-900">
+                    {s.template_name}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    Sonraki: {formatTR(s.next_run_at)} • {s.timezone} • {s.run_time}
+                  </div>
+                </div>
+
+                <div className="text-xs text-slate-600">
+                  {s.frequency} / {s.interval}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <CronHistoryExpandable runs={runs} />
+    </div>
   );
 }

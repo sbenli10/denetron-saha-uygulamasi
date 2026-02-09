@@ -1,17 +1,17 @@
 // APP/app/components/assign/CronScheduler.tsx
 "use client";
 
-import { Calendar, Timer, Repeat, Clock, Hourglass } from "lucide-react";
+import { Repeat, Clock, Hourglass } from "lucide-react";
 
-export type DuePolicy = "same_day" | "hours" | "days";
+export type DuePolicy = "hours" | "days";
 
 export interface CronProps {
   frequency: "daily" | "weekly" | "monthly";
   interval: number;
-  dayOfWeek: number | null;
-  dayOfMonth: number | null;
+  dayOfWeek: number | null;   // ✅ 0-6 (Pzt=0 ... Paz=6)
+  dayOfMonth: number | null;  // 1-31
+  runTime: string;            // "HH:mm"
 
-  runTime: string; // "09:00"
   duePolicy: DuePolicy;
   dueValue: number;
 
@@ -19,8 +19,8 @@ export interface CronProps {
   onIntervalChange: (v: number) => void;
   onDayOfWeekChange: (v: number | null) => void;
   onDayOfMonthChange: (v: number | null) => void;
-
   onRunTimeChange: (v: string) => void;
+
   onDuePolicyChange: (v: DuePolicy) => void;
   onDueValueChange: (v: number) => void;
 }
@@ -43,6 +43,7 @@ export default function CronScheduler(props: CronProps) {
     onDueValueChange,
   } = props;
 
+  // ✅ DB uyumlu: 0-6 (Pzt=0 ... Paz=6)
   const days = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 
   return (
@@ -50,7 +51,12 @@ export default function CronScheduler(props: CronProps) {
       {/* HEADER */}
       <div className="flex items-center gap-3">
         <Repeat className="text-indigo-600" />
-        <h2 className="text-lg font-semibold">Zamanlama Ayarları</h2>
+        <div>
+          <h2 className="text-lg font-semibold">Zamanlama Ayarları</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Bu ayarlar, görevlerin ne zaman ve hangi sıklıkla otomatik oluşturulacağını belirler.
+          </p>
+        </div>
       </div>
 
       {/* RUN TIME */}
@@ -58,6 +64,10 @@ export default function CronScheduler(props: CronProps) {
         <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
           <Clock size={16} /> Çalışma Saati
         </label>
+        <p className="text-xs text-slate-500 mt-1">
+          Görevler seçtiğiniz saatte otomatik oluşturulur. (Örn: 09:00)
+        </p>
+
         <input
           type="time"
           value={runTime}
@@ -67,33 +77,44 @@ export default function CronScheduler(props: CronProps) {
       </div>
 
       {/* FREQUENCY */}
-      <div className="grid grid-cols-3 gap-3">
-        {["daily", "weekly", "monthly"].map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => onFrequencyChange(f as any)}
-            className={`p-3 rounded-xl border ${
-              frequency === f
-                ? "bg-indigo-50 border-indigo-400 text-indigo-700"
-                : "bg-white border-slate-200"
-            }`}
-          >
-            {f === "daily" && "Günlük"}
-            {f === "weekly" && "Haftalık"}
-            {f === "monthly" && "Aylık"}
-          </button>
-        ))}
+      <div>
+        <label className="text-sm font-medium text-slate-700">Görev Sıklığı</label>
+        <p className="text-xs text-slate-500 mt-1">
+          Günlük / Haftalık / Aylık seçenekleriyle tekrar biçimini seçin.
+        </p>
+
+        <div className="grid grid-cols-3 gap-3 mt-3">
+          {(["daily", "weekly", "monthly"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => onFrequencyChange(f)}
+              className={`p-3 rounded-xl border transition ${
+                frequency === f
+                  ? "bg-indigo-50 border-indigo-400 text-indigo-700"
+                  : "bg-white border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {f === "daily" && "Günlük"}
+              {f === "weekly" && "Haftalık"}
+              {f === "monthly" && "Aylık"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* INTERVAL */}
       <div>
-        <label className="text-sm font-medium">Tekrar Aralığı</label>
+        <label className="text-sm font-medium text-slate-700">Tekrar Aralığı</label>
+        <p className="text-xs text-slate-500 mt-1">
+          Kaç günde / haftada / ayda bir tekrar edeceğini belirler. (Min: 1)
+        </p>
+
         <input
           type="number"
           min={1}
           value={interval}
-          onChange={(e) => onIntervalChange(+e.target.value || 1)}
+          onChange={(e) => onIntervalChange(Math.max(1, +e.target.value || 1))}
           className="mt-2 w-24 px-3 py-2 border rounded-lg"
         />
       </div>
@@ -101,36 +122,51 @@ export default function CronScheduler(props: CronProps) {
       {/* WEEKLY */}
       {frequency === "weekly" && (
         <div>
-          <label className="text-sm font-medium">Gün Seç</label>
+          <label className="text-sm font-medium text-slate-700">Haftanın Günü</label>
+          <p className="text-xs text-slate-500 mt-1">
+            Görevin hangi gün otomatik oluşturulacağını seçin.
+          </p>
+
           <div className="grid grid-cols-7 gap-2 mt-2">
             {days.map((d, i) => (
               <button
                 key={i}
                 type="button"
-                onClick={() => onDayOfWeekChange(dayOfWeek === i + 1 ? null : i + 1)}
-                className={`py-2 rounded-lg ${
-                  dayOfWeek === i + 1
-                    ? "bg-indigo-100 border border-indigo-400"
-                    : "bg-white border"
+                onClick={() => onDayOfWeekChange(dayOfWeek === i ? null : i)}
+                className={`py-2 rounded-lg border transition ${
+                  dayOfWeek === i
+                    ? "bg-indigo-100 border-indigo-400"
+                    : "bg-white border-slate-200 hover:bg-slate-50"
                 }`}
               >
                 {d}
               </button>
             ))}
           </div>
+
+          <p className="text-[11px] text-slate-400 mt-2">
+            Not: Sistem tarafında günler 0-6 aralığında tutulur (Pzt=0, …, Paz=6).
+          </p>
         </div>
       )}
 
       {/* MONTHLY */}
       {frequency === "monthly" && (
         <div>
-          <label className="text-sm font-medium">Ayın Günü</label>
+          <label className="text-sm font-medium text-slate-700">Ayın Günü</label>
+          <p className="text-xs text-slate-500 mt-1">
+            Görevin ayın hangi gününde otomatik oluşturulacağını seçin (1–31).
+          </p>
+
           <input
             type="number"
             min={1}
             max={31}
             value={dayOfMonth ?? ""}
-            onChange={(e) => onDayOfMonthChange(+e.target.value || null)}
+            onChange={(e) => {
+              const v = +e.target.value;
+              onDayOfMonthChange(Number.isFinite(v) && v >= 1 && v <= 31 ? v : null);
+            }}
             className="mt-2 w-24 px-3 py-2 border rounded-lg"
           />
         </div>
@@ -138,29 +174,35 @@ export default function CronScheduler(props: CronProps) {
 
       {/* SLA */}
       <div className="pt-4 border-t space-y-3">
-        <label className="text-sm font-medium flex items-center gap-2">
+        <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
           <Hourglass size={16} /> SLA (Bitiş Süresi)
         </label>
+        <p className="text-xs text-slate-500">
+          Oluşturulan görevlerin en geç ne kadar sürede tamamlanması gerektiğini belirler.
+        </p>
 
-        <select
-          value={duePolicy}
-          onChange={(e) => onDuePolicyChange(e.target.value as DuePolicy)}
-          className="px-3 py-2 border rounded-lg"
-        >
-          <option value="same_day">Aynı Gün</option>
-          <option value="hours">X Saat Sonra</option>
-          <option value="days">X Gün Sonra</option>
-        </select>
+        <div className="flex items-center gap-3">
+          <select
+            value={duePolicy}
+            onChange={(e) => onDuePolicyChange(e.target.value as DuePolicy)}
+            className="px-3 py-2 border rounded-lg"
+          >
+            <option value="hours">X Saat Sonra</option>
+            <option value="days">X Gün Sonra</option>
+          </select>
 
-        {duePolicy !== "same_day" && (
           <input
             type="number"
             min={1}
             value={dueValue}
-            onChange={(e) => onDueValueChange(+e.target.value || 1)}
+            onChange={(e) => onDueValueChange(Math.max(1, +e.target.value || 1))}
             className="w-24 px-3 py-2 border rounded-lg"
           />
-        )}
+
+          <span className="text-sm text-slate-500">
+            {duePolicy === "hours" ? "saat" : "gün"}
+          </span>
+        </div>
       </div>
     </div>
   );

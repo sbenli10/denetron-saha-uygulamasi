@@ -5,15 +5,14 @@ import type { FormEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Globe, Lock, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter,useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 // GPU fluid dışarı alındı
 import GPULiquid from "./components/GPULiquid";
 import { supabaseAuth } from "@/lib/supabase/auth";
-
 /******************************** THEMES ********************************/
 type ThemeMode = "light" | "dark";
-
+type Step = "password" | "otp";
 const themes: Record<ThemeMode, { bg: string; text: string; card: string }> = {
   light: {
     bg: "#f4f7ff",
@@ -26,7 +25,6 @@ const themes: Record<ThemeMode, { bg: string; text: string; card: string }> = {
     card: "rgba(12,18,32,0.7)",
   },
 };
-const supabase = supabaseAuth();
 
 
 /******************************** INPUT ********************************/
@@ -157,21 +155,30 @@ export default function LoginPage() {
   const [themeMode, setThemeMode] = useState<ThemeMode>("dark");
   const theme = themes[themeMode];
   const router = useRouter();
-
+  const [step, setStep] = useState<Step>("password");
+  const [otp, setOtp] = useState("");
+  const [challenge, setChallenge] = useState<{
+    factorId: string;
+    challengeId: string;
+  } | null>(null);
+  const searchParams = useSearchParams();
+  const reason = searchParams.get("reason");
+  const [trustDevice, setTrustDevice] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [capsLockOn, setCapsLockOn] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const [isVerifyingSession, setIsVerifyingSession] = useState(false);
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [passwordStrength, setPasswordStrength] = useState(0);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [loginRole, setLoginRole] = useState<"operator" | "owner">("operator");
-  const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotSuccess, setForgotSuccess] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
+  const [rememberMe, setRememberMe] = useState(false);
+  const [loginRole, setLoginRole] = useState<"operator" | "owner">("operator"); 
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [, setForgotSuccess] = useState(false);
+  const [, setPendingLogin] = useState<{
+  role: "admin" | "operator";
+  
+} | null>(null);
 async function handleForgotPassword() {
   if (!email) {
     setError("Şifre sıfırlamak için email adresinizi giriniz.");
@@ -204,6 +211,60 @@ async function handleForgotPassword() {
   }
 }
 
+async function handleVerifyOtp(e: FormEvent) {
+  e.preventDefault();
+  if (verifyingOtp) return;
+
+  setVerifyingOtp(true);
+  setError("");
+
+  try {
+    if (!challenge || otp.length !== 6) {
+      setError("6 haneli doğrulama kodunu girin");
+      return;
+    }
+
+    const res = await fetch("/api/login/mfa/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        factorId: challenge.factorId,
+        challengeId: challenge.challengeId,
+        code: otp,
+        rememberMe,
+        trustDevice,
+      }),
+    });
+
+    const out = await res.json();
+
+    if (!res.ok) {
+      setError(out.error || "Doğrulama başarısız");
+      return;
+    }
+
+    setIsRedirecting(true);
+    router.replace(
+      out.role === "admin" ? "/admin/dashboard" : "/operator"
+    );
+  } finally {
+    setVerifyingOtp(false);
+    // ❌ setIsRedirecting(false) → KALDIR
+  }
+}
+
+const shownRef = useRef(false);
+
+useEffect(() => {
+  if (reason === "expired" && !shownRef.current) {
+    shownRef.current = true;
+    toast.warning("Oturum süresi doldu", {
+      description: "Güvenliğiniz için tekrar giriş yapmanız gerekiyor.",
+    });
+  }
+}, [reason]);
+
+
 async function handleLogin(
   e: FormEvent<HTMLFormElement>,
   loginRole: "operator" | "owner"
@@ -235,36 +296,53 @@ async function handleLogin(
       return;
     }
 
-    const role = out.role as "admin" | "operator";
+    /**
+     * 🔐 MFA GEREKLİ → OTP ADIMI
+     */
+    if (out.mfaRequired) {
+      toast.info("Ek güvenlik doğrulaması gerekiyor", {
+        description: "Authenticator kodu istenecek",
+      });
 
-    setIsRedirecting(true);
-    setIsVerifyingSession(true);
+      const cRes = await fetch("/api/login/mfa/challenge", {
+        method: "POST",
+      });
 
-    toast.success("Giriş başarılı", {
-      description: "Oturum doğrulanıyor…",
-    });
+      const cOut = await cRes.json();
 
-        // 🔑 KRİTİK: session gerçekten oluşana kadar bekle
-    let tries = 0;
-    const interval = setInterval(async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (session || tries > 10) {
-        clearInterval(interval);
-
-        router.replace(
-          role === "admin" ? "/admin/dashboard" : "/operator"
-        );
+      if (!cRes.ok) {
+        setError(cOut.error || "2FA başlatılamadı");
+        return;
       }
 
-      tries++;
-    }, 300);
-  } catch {
+      setChallenge({
+        factorId: cOut.factorId,
+        challengeId: cOut.challengeId,
+      });
+
+      setStep("otp");
+      return;
+    }
+
+    /**
+     * ✅ MFA YOK → DİREKT GİRİŞ
+     */
+    setIsRedirecting(true);
+
+    toast.success("Giriş başarılı", {
+      description: "Yönlendiriliyorsunuz…",
+    });
+
+    router.replace(
+      out.role === "admin" ? "/admin/dashboard" : "/operator"
+    );
+  } catch (err) {
+    console.error("[LOGIN UI ERROR]", err);
     setError("Sunucuya ulaşılamıyor.");
   }
 }
+
+
 return (
   <div
     className="
@@ -343,86 +421,178 @@ return (
               İş Güvenliği Uzmanı
             </button>
           </div>
+         {/* ================= FORM ================= */}
 
-          {/* ================= FORM ================= */}
-          <form onSubmit={(e) => handleLogin(e, loginRole)} className="space-y-6">
-
-            {error && (
-              <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/30 px-4 py-3 rounded-xl">
-                <AlertTriangle size={18} />
-                {error}
+         {reason === "expired" && (
+          <div
+            className="
+              mb-4 flex items-start gap-3
+              rounded-xl border border-amber-500/30
+              bg-amber-500/10 px-4 py-3
+              text-sm text-amber-300
+            "
+          >
+            <AlertTriangle className="mt-0.5" size={18} />
+            <div>
+              <div className="font-medium">
+                Oturum süreniz sona erdi
               </div>
-            )}
-
-            {/* EMAIL */}
-            <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wide text-white/60">
-                {loginRole === "operator" ? "Operatör Email" : "Yönetici Email"}
-              </label>
-              <Input
-                icon={Globe}
-                placeholder={
-                  loginRole === "operator"
-                    ? "operator@firma.com"
-                    : "yonetici@firma.com"
-                }
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setError("");
-                }}
-              />
+              <div className="text-xs opacity-80">
+                Güvenliğiniz için tekrar giriş yapmanız gerekiyor.
+              </div>
             </div>
+          </div>
+        )}
 
-            {/* PASSWORD (GÖRÜNÜR) */}
-            <div className="relative">
-              <Input
-                type={showPassword ? "text" : "password"}
-                icon={Lock}
-                placeholder="Şifre"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setError("");
-                }}
-                className="pr-12"
+
+          {/* 🔑 STEP 1 — PASSWORD */}
+          {step === "password" && (
+            <form onSubmit={(e) => handleLogin(e, loginRole)} className="space-y-6">
+
+              {error && (
+                <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/30 px-4 py-3 rounded-xl">
+                  <AlertTriangle size={18} />
+                  {error}
+                </div>
+              )}
+
+              {/* EMAIL */}
+              <div className="space-y-1">
+                <label className="text-xs uppercase tracking-wide text-white/60">
+                  {loginRole === "operator" ? "Operatör Email" : "Yönetici Email"}
+                </label>
+                <Input
+                  icon={Globe}
+                  placeholder={
+                    loginRole === "operator"
+                      ? "operator@firma.com"
+                      : "yonetici@firma.com"
+                  }
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError("");
+                  }}
+                />
+              </div>
+
+              {/* PASSWORD */}
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  icon={Lock}
+                  placeholder="Şifre"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError("");
+                  }}
+                  className="pr-12"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+
+              <button
+                  type="submit"
+                  disabled={isRedirecting}
+                  className={`
+                    w-full py-3.5 rounded-xl text-sm font-semibold
+                    transition-all duration-200
+                    ${
+                      isRedirecting
+                        ? "bg-blue-400 cursor-not-allowed"
+                        : "bg-gradient-to-r from-blue-600 to-blue-700 hover:-translate-y-0.5 hover:shadow-xl"
+                    }
+                  `}
+                >
+                  {isRedirecting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Giriş yapılıyor…
+                    </span>
+                  ) : (
+                    loginRole === "owner"
+                      ? "Yönetici Girişi"
+                      : "Operatör Girişi"
+                  )}
+                </button>
+
+            </form>
+          )}
+
+          {/* 🔐 STEP 2 — OTP */}
+          {step === "otp" && (
+            <form onSubmit={handleVerifyOtp} className="space-y-6">
+
+              {error && (
+                <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/30 px-4 py-3 rounded-xl">
+                  <AlertTriangle size={18} />
+                  {error}
+                </div>
+              )}
+
+              <div className="text-center text-sm text-white/70">
+                Authenticator uygulamanızdaki <b>6 haneli kodu</b> girin
+              </div>
+
+              <input
+                autoFocus
+                autoComplete="one-time-code"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                maxLength={6}
+                inputMode="numeric"
+                placeholder="123456"
+                className="
+                  w-full h-12 text-center tracking-widest
+                  rounded-xl bg-white/10 border border-white/20
+                  text-white
+                "
               />
 
-              {/* GİZLE / GÖSTER */}
+              <label className="flex items-center gap-2 text-xs text-white/70">
+                <input
+                  type="checkbox"
+                  checked={trustDevice}
+                  onChange={(e) => setTrustDevice(e.target.checked)}
+                />
+                Bu cihazda tekrar sorma
+              </label>
+
+              <button
+                disabled={isRedirecting}
+                className="
+                  w-full h-12 rounded-xl
+                  bg-emerald-600 text-white font-semibold
+                  disabled:opacity-50
+                "
+              >
+                {isRedirecting ? "Doğrulanıyor…" : "Doğrula ve Giriş Yap"}
+              </button>
+
+              {/* ⬅️ GERİ DÖN */}
               <button
                 type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="
-                  absolute right-3 top-1/2 -translate-y-1/2
-                  text-white/60 hover:text-white
-                  transition
-                "
-                title={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
+                onClick={() => {
+                  setStep("password");
+                  setOtp("");
+                  setChallenge(null);
+                  setError("");
+                }}
+                className="block mx-auto text-xs text-white/50 hover:underline"
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                Geri dön
               </button>
-            </div>
+            </form>
+          )}
 
-            {/* SUBMIT */}
-            <button
-              disabled={isRedirecting}
-              className={`
-                w-full py-3.5 rounded-xl text-sm font-semibold
-                transition-all
-                ${
-                  isRedirecting
-                    ? "bg-blue-400 cursor-not-allowed"
-                    : "bg-gradient-to-r from-blue-600 to-blue-700 hover:-translate-y-0.5 hover:shadow-xl"
-                }
-              `}
-            >
-              {isVerifyingSession
-                ? "Oturum doğrulanıyor…"
-                : loginRole === "owner"
-                ? "Yönetici Girişi"
-                : "Operatör Girişi"}
-            </button>
-          </form>
 
           {/* ================= FOOTER ================= */}
           <footer className="mt-6 flex justify-between text-xs text-white/50">
@@ -448,20 +618,6 @@ return (
                 : "Şifremi unuttum"}
             </button>
           </div>
-
-
-
-          {/* ================= SESSION OVERLAY ================= */}
-          {isVerifyingSession && (
-            <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-xl rounded-3xl">
-              <div className="text-center space-y-3">
-                <div className="animate-spin rounded-full h-10 w-10 border-2 border-white border-t-transparent mx-auto" />
-                <p className="text-sm opacity-80">
-                  Oturum güvenliği doğrulanıyor…
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

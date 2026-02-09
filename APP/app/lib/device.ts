@@ -1,3 +1,4 @@
+//APP\app\lib\device.ts
 import crypto from "crypto";
 
 export function parseDevice(agent: string) {

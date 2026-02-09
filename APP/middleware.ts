@@ -1,34 +1,41 @@
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
+// APP/middleware.ts
 import { NextResponse, type NextRequest } from "next/server";
-import { supabaseServiceRoleClient } from "@/lib/supabase/server";
-
 
 export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const { pathname, searchParams } = req.nextUrl;
 
-  // Herkese açık sayfalar
+  /**
+   * 1️⃣ PUBLIC ROUTES
+   * Login & auth akışları ASLA bloklanmaz
+   */
   const publicPaths = [
     "/login",
     "/register",
     "/invite",
     "/reset-password",
-    "/auth", // forgot-password vb
+    "/auth",
   ];
-
-  
 
   if (publicPaths.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
-  // Korunan alanlar
+  /**
+   * 2️⃣ SADECE PROTECTED ALANLARI KORU
+   */
   const protectedPaths = ["/admin", "/operator"];
+  const isProtected = protectedPaths.some((p) =>
+    pathname.startsWith(p)
+  );
 
-  if (!protectedPaths.some((p) => pathname.startsWith(p))) {
+  if (!isProtected) {
     return NextResponse.next();
   }
 
-  // ✅ Supabase v2 session cookie kontrolü
+  /**
+   * 3️⃣ SUPABASE SESSION VAR MI?
+   * sb-*-auth-token cookie kontrolü
+   */
   const hasSession = req.cookies
     .getAll()
     .some(
@@ -38,9 +45,28 @@ export function middleware(req: NextRequest) {
     );
 
   if (!hasSession) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
+  /**
+   * 4️⃣ MFA GATE
+   * - MFA gerekiyorsa ama tamamlanmamışsa
+   * - Login sayfasına geri gönder
+   */
+  const mfaOk = req.cookies.get("mfa_ok")?.value === "1";
+
+  if (!mfaOk) {
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("mfa", "1");
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  /**
+   * 5️⃣ HER ŞEY TAMAM
+   */
   return NextResponse.next();
 }
 

@@ -13,6 +13,19 @@ import TemplatePicker from "./TemplatePicker";
    STATE TYPE
 -------------------------------------------- */
 // APP/app/components/assign/ScheduleBuilder.tsx
+type SummaryPanelProps = {
+  template: TemplateDTO | null;
+  operators: OperatorDTO[];
+  cronPreview: string;
+  isPremium: boolean;
+
+  // 🔥 ZAMANLAMA BİLGİLERİ (ŞART)
+  frequency: "daily" | "weekly" | "monthly";
+  interval: number;
+  dayOfWeek: number | null;
+  dayOfMonth: number | null;
+  runTime: string;
+};
 
 export interface BuilderState {
   templateId: string;
@@ -25,7 +38,7 @@ export interface BuilderState {
 
   // 🔽 YENİ EKLENENLER
   runTime: string;                 // "09:00"
-  duePolicy: "same_day" | "hours" | "days";
+  duePolicy: "hours" | "days";
   dueValue: number;
 }
 
@@ -71,50 +84,120 @@ function StepHeader({ step, title, active, completed }: any) {
   );
 }
 
-/* --------------------------------------------
-   SUMMARY PANEL
--------------------------------------------- */
+function humanizeSchedule({
+  frequency,
+  interval,
+  dayOfWeek,
+  dayOfMonth,
+  runTime,
+}: {
+  frequency: "daily" | "weekly" | "monthly";
+  interval: number;
+  dayOfWeek: number | null;
+  dayOfMonth: number | null;
+  runTime: string;
+}) {
+  const time = runTime || "09:00";
+  const every = interval > 1 ? `${interval} ` : "";
+
+  if (frequency === "daily") {
+    return `Her ${every}gün saat ${time}`;
+  }
+
+  if (frequency === "weekly") {
+    const days = [
+      "Pazartesi",
+      "Salı",
+      "Çarşamba",
+      "Perşembe",
+      "Cuma",
+      "Cumartesi",
+      "Pazar",
+    ];
+    return `Her ${every}hafta ${days[dayOfWeek ?? 0]} günü saat ${time}`;
+  }
+
+  if (frequency === "monthly") {
+    return `Her ayın ${dayOfMonth ?? "seçilen"} günü saat ${time}`;
+  }
+
+  return "Zamanlama tanımlanmadı";
+}
+
+
 function SummaryPanel({
   template,
   operators,
   cronPreview,
   isPremium,
-}: {
-  template: TemplateDTO | null;
-  operators: OperatorDTO[];
-  cronPreview: string;
-  isPremium: boolean;
-}) {
+  frequency,
+  interval,
+  dayOfWeek,
+  dayOfMonth,
+  runTime,
+}: SummaryPanelProps) {
   return (
-    <div className={`${cardBase} p-6 sticky top-10`}>
-      <h3 className="text-xl font-semibold mb-4">Görev Özeti</h3>
+    <div className={`${cardBase} p-6 sticky top-10 space-y-4`}>
+      <h3 className="text-xl font-semibold">Görev Özeti</h3>
 
-      <p className="text-sm text-slate-500">Şablon</p>
-      <p className="mb-4">{template?.name ?? "-"}</p>
+      <div>
+        <p className="text-sm text-slate-500">Şablon</p>
+        <p className="font-medium">{template?.name ?? "-"}</p>
+      </div>
 
-      <p className="text-sm text-slate-500">Operatörler</p>
-      <ul className="mb-4 list-disc list-inside">
-        {operators.map((op) => (
-          <li key={op.id}>{op.full_name}</li>
-        ))}
-      </ul>
+      <div>
+        <p className="text-sm text-slate-500">Operatörler</p>
+        {operators.length > 0 ? (
+          <ul className="list-disc list-inside text-sm mt-1">
+            {operators.map((op) => (
+              <li key={op.id}>{op.full_name}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-600">Operatör seçilmedi</p>
+        )}
+      </div>
 
-      <p className="text-sm text-slate-500">
-        {isPremium ? "Zamanlama (Önizleme)" : "Görev Türü"}
-      </p>
+      <div>
+        <p className="text-sm text-slate-500">
+          {isPremium ? "Zamanlama" : "Görev Türü"}
+        </p>
 
-      {isPremium ? (
-        <code className="text-indigo-600 text-sm block mt-1">
-          {cronPreview || "-"}
-        </code>
-      ) : (
-        <span className="inline-block mt-1 px-3 py-1 text-xs rounded-full bg-amber-100 text-amber-700">
-          Bu görev tek seferliktir
-        </span>
-      )}
+        {isPremium ? (
+          <div className="mt-1 space-y-1">
+            <p className="font-medium text-slate-800">
+              {humanizeSchedule({
+                frequency,
+                interval,
+                dayOfWeek,
+                dayOfMonth,
+                runTime,
+              })}
+            </p>
+
+            <p className="text-xs text-slate-500">
+              Bu kurala göre görevler otomatik oluşturulur.
+            </p>
+
+            <details className="text-xs text-slate-400">
+              <summary className="cursor-pointer">
+                Teknik önizleme
+              </summary>
+              <code className="block mt-1 text-indigo-600">
+                {cronPreview}
+              </code>
+            </details>
+          </div>
+        ) : (
+          <span className="inline-block mt-1 px-3 py-1 text-xs rounded-full bg-amber-100 text-amber-700">
+            Tek seferlik görev (hemen oluşturulur)
+          </span>
+        )}
+      </div>
     </div>
   );
 }
+
 
 /* --------------------------------------------
    MAIN COMPONENT
@@ -134,7 +217,8 @@ export default function ScheduleBuilder({
   const [dayOfMonth, setDayOfMonth] = useState<number | null>(null);
   const [activeStep, setActiveStep] = useState(1);
   const [runTime, setRunTime] = useState("09:00");
-  const [duePolicy, setDuePolicy] = useState<"same_day" | "hours" | "days">("same_day");
+  const [duePolicy, setDuePolicy] =
+    useState<"hours" | "days">("hours");
   const [dueValue, setDueValue] = useState(1);
 
   /* -----------------------------
@@ -305,11 +389,17 @@ useEffect(() => {
       </div>
 
       <SummaryPanel
-        template={templates.find((t) => t.id === templateId) ?? null}
-        operators={operators.filter((o) => operatorIds.includes(o.id))}
-        cronPreview={cronPreview}
-        isPremium={isPremium}
-      />
+      template={templates.find((t) => t.id === templateId) ?? null}
+      operators={operators.filter((o) => operatorIds.includes(o.id))}
+      isPremium={isPremium}
+      cronPreview={cronPreview}
+      frequency={frequency}
+      interval={interval}
+      dayOfWeek={dayOfWeek}
+      dayOfMonth={dayOfMonth}
+      runTime={runTime}
+    />
+
     </div>
   );
 }

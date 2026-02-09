@@ -104,7 +104,7 @@ export default function DashboardGrid({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-            Analytics Dashboard
+           Genel Durum
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Operasyon verileri, trendler ve son aktiviteler.
@@ -157,7 +157,7 @@ export default function DashboardGrid({
         {/* MAIN CHART */}
         <div className="lg:col-span-8">
           <ChartWidget
-            title="Denetim Trendleri"
+            title="Denetim Hareketleri"
             description="7G / 30G / 12A görünümü"
             data7d={trend30.slice(-7).map((d) => ({ label: d.day, value: d.count }))}
             data30d={trend30.map((d) => ({ label: d.day, value: d.count }))}
