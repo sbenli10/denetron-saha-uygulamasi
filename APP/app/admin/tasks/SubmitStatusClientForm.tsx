@@ -29,9 +29,10 @@ export default function SubmitStatusClientForm({
     dayOfWeek: null,
     dayOfMonth: null,
     runTime: "09:00",
-    duePolicy: "same_day",
-    dueValue: 1,
+    duePolicy: "hours", // ✅
+    dueValue: 24,       // ✅ DB default ile uyumlu
   });
+
 
   const [result, setResult] = useState<{
     success: boolean;
