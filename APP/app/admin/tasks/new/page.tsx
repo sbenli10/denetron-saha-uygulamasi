@@ -1,29 +1,35 @@
-//APP\app\admin\tasks\new\page.tsx
+// APP/app/admin/tasks/new/page.tsx
 export const dynamic = "force-dynamic";
 
 import ManualTaskClient from "./page.client";
 import { getAdminContext } from "@/lib/admin/context";
 import { supabaseServiceRoleClient } from "@/lib/supabase/server";
 
-
 type PageData =
-  | { redirectPremium: true }
+  | { blocked: true }
   | {
-      redirectPremium: false;
-      templates: any[];
-      operators: any[];
+      blocked: false;
+      templates: {
+        id: string;
+        name: string;
+      }[];
+      operators: {
+        id: string;
+        full_name: string;
+        email: string;
+      }[];
     };
 
 async function getData(): Promise<PageData> {
-  const { member, org } = await getAdminContext();
+  const { member, org, access } = await getAdminContext();
 
   if (!member || !org) {
     throw new Error("Yetkisiz erişim");
   }
 
-  // ❗ Premium kullanıcı bu sayfayı kullanamaz
-  if (org.is_premium) {
-    return { redirectPremium: true };
+  // ❌ FREE PLAN ENGELİ
+  if (!access.premium) {
+    return { blocked: true };
   }
 
   const db = supabaseServiceRoleClient();
@@ -42,15 +48,15 @@ async function getData(): Promise<PageData> {
   ]);
 
   return {
-    redirectPremium: false,
+    blocked: false,
     templates:
       templatesRes.data?.map((t) => ({
-        id: t.id,
+        id: String(t.id),
         name: t.name,
       })) ?? [],
     operators:
       operatorsRes.data?.map((o) => ({
-        id: o.user_id,
+        id: String(o.user_id),
         full_name: o.name,
         email: o.email,
       })) ?? [],
@@ -60,21 +66,23 @@ async function getData(): Promise<PageData> {
 export default async function NewManualTaskPage() {
   const data = await getData();
 
-  if (data.redirectPremium) {
+  if (data.blocked) {
     return (
-  
-        <div className="p-10 text-center text-slate-600">
-          Bu sayfa yalnızca Free plan içindir.
+      <div className="p-10 text-center space-y-3">
+        <div className="text-lg font-medium text-slate-700">
+          Bu özellik Premium planlara özeldir
         </div>
+        <p className="text-sm text-slate-500">
+          Manuel görev oluşturmak için deneme veya premium plana geçmeniz gerekir.
+        </p>
+      </div>
     );
   }
 
   return (
-
-      <ManualTaskClient
-        templates={data.templates}
-        operators={data.operators}
-      />
-   
+    <ManualTaskClient
+      templates={data.templates}
+      operators={data.operators}
+    />
   );
 }

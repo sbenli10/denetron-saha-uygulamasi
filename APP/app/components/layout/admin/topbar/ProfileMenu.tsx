@@ -1,3 +1,4 @@
+//APP\app\components\layout\admin\topbar\ProfileMenu.tsx
 "use client";
 
 import * as React from "react";
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { applyRipple } from "@/app/components/ui/ripple";
 import { signOutAction } from "@/app/auth/signOutAction";
 import DenetronPremiumBadge from "@/app/components/premium/DenetronPremiumBadge";
+import { SheetOverlay } from "@/components/ui/sheet";
 
 // shadcn/ui
 import {
@@ -324,7 +326,7 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
     );
   }
 
-  // Mobile: Bottom sheet
+ // Mobile: Bottom sheet
   return (
     <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
       <SheetTrigger asChild>
@@ -334,21 +336,34 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
       </SheetTrigger>
 
       <SheetContent
-          side="bottom"
-          className={cn(
-            "rounded-t-2xl border border-border/60 p-0",
-            "bg-neutral-950 text-neutral-100", // 👈 DAHA KOYU
-            "shadow-[0_-24px_80px_rgba(0,0,0,0.8)]"
-          )}
-        >
+        side="bottom"
+        className={cn(
+          // 🧱 Layout
+          "fixed inset-x-0 bottom-0 z-50",
+          "flex flex-col",
 
-        <SheetHeader className="px-4 pt-4 pb-3">
+          // 🎨 Görsel
+          "rounded-t-2xl border border-border/60",
+          "bg-neutral-950 text-neutral-100",
+          "shadow-[0_-24px_80px_rgba(0,0,0,0.8)]",
+
+          // 📱 iOS / Mobile FIX (EN KRİTİK KISIM)
+          "h-[100dvh] max-h-[100dvh] sm:h-auto",
+          "overflow-y-auto overscroll-contain",
+
+          // 🧼 Padding reset (content içeride verilecek)
+          "p-0"
+        )}
+      >
+        {/* HEADER */}
+        <SheetHeader className="px-4 pt-4 pb-3 shrink-0">
           <SheetTitle className="text-left text-base">
             <IdentityHeader user={user} />
           </SheetTitle>
         </SheetHeader>
 
-        <div className="px-2 pb-3">
+        {/* CONTENT */}
+        <div className="flex-1 px-2 pb-4">
           <ActionRow
             icon={User}
             label="Profil"
@@ -381,9 +396,11 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
             }}
           />
 
-          <div className="h-2" />
+          {/* iOS safe bottom space */}
+          <div className="h-6" />
         </div>
       </SheetContent>
     </Sheet>
   );
+
 }

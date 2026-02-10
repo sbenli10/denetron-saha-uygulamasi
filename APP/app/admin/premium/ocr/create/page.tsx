@@ -118,8 +118,6 @@ export default function PremiumOCRCreatePage() {
     }
   }
 
-
-
   return (
     <div className="w-full max-w-2xl mx-auto space-y-10 text-gray-900">
 
@@ -129,8 +127,8 @@ export default function PremiumOCRCreatePage() {
           Şablon Oluşturma
         </h1>
         <p className="text-base text-gray-600">
-          Belgenizi yükleyin. Sistem, belge içeriğini analiz ederek otomatik alan
-          eşleştirmeleri ve şablon yapısı oluşturur.
+          Belgenizi yükleyin. Yapay Zeka, belge içeriğini analiz ederek otomatik alan
+          eşleştirmeleri ve şablon yapısı oluştursun.
         </p>
       </header>
 
@@ -212,7 +210,7 @@ export default function PremiumOCRCreatePage() {
             disabled:opacity-40
           "
         >
-          {loading ? "OCR İşleniyor…" : "Şablonu Oluştur"}
+          {loading ? "Yapay Zeka Analiz Ediyor…" : "Şablonu Oluştur"}
         </button>
 
         {loading && <AILoader />}

@@ -1,3 +1,4 @@
+//APP\app\admin\upgrade\upgradeClient.tsx
 "use client";
 
 import { Crown, Lock, ArrowRight, CheckCircle2 } from "lucide-react";
@@ -7,9 +8,10 @@ export default function UpgradeClient({
   role,
   orgName,
 }: {
-  isPremium: boolean;
+   isPremium: boolean;
   role: string | null;
   orgName: string;
+  plan: "free" | "trial" | "premium";
 }) {
   const isAdmin = role?.toLowerCase() === "admin";
 

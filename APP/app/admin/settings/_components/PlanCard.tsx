@@ -1,3 +1,4 @@
+//APP\app\admin\settings\_components\PlanCard.tsx
 "use client";
 
 import { Crown, Check } from "lucide-react";

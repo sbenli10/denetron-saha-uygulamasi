@@ -1,7 +1,6 @@
 // APP/app/admin/roles/[id]/page.tsx
 export const dynamic = "force-dynamic";
 
-import ShellLayout from "@/components/layout/admin/shell/ShellLayout";
 import { getAdminContext } from "@/lib/admin/context";
 import { supabaseServiceRoleClient } from "@/lib/supabase/server";
 import { updateRole } from "./actions";
@@ -18,7 +17,11 @@ const PERMISSIONS = [
   "admin.access",
 ];
 
-export default async function EditRolePage({ params }: { params: { id: string } }) {
+export default async function EditRolePage({
+  params,
+}: {
+  params: { id: string };
+}) {
   const { member } = await getAdminContext();
   const admin = supabaseServiceRoleClient();
 
@@ -31,19 +34,18 @@ export default async function EditRolePage({ params }: { params: { id: string } 
 
   if (!role) {
     return (
-      <ShellLayout>
-        <div className="text-red-600 font-medium text-lg">Rol bulunamadı.</div>
-      </ShellLayout>
+      <div className="text-red-600 font-medium text-lg">
+        Rol bulunamadı.
+      </div>
     );
   }
 
   return (
-    <ShellLayout>
+    <>
       {/* ================================
             macOS SONOMA BACKGROUND FX
       ================================= */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        
         {/* Soft pastel blobs */}
         <div className="absolute -top-44 -left-32 w-[600px] h-[600px] rounded-full bg-[rgba(145,160,255,0.28)] blur-[150px]" />
         <div className="absolute -bottom-48 -right-20 w-[580px] h-[580px] rounded-full bg-[rgba(130,210,255,0.25)] blur-[180px]" />
@@ -53,7 +55,6 @@ export default async function EditRolePage({ params }: { params: { id: string } 
       </div>
 
       <div className="relative space-y-12">
-
         {/* ================================
                 HEADER
         ================================= */}
@@ -86,7 +87,6 @@ export default async function EditRolePage({ params }: { params: { id: string } 
               space-y-10
             "
           >
-
             {/* ================================
                     ROLE NAME INPUT
             ================================= */}
@@ -125,7 +125,7 @@ export default async function EditRolePage({ params }: { params: { id: string } 
                   max-h-80 overflow-y-auto
                   p-5 rounded-xl
                   bg-white/55 backdrop-blur-xl
-                  border border-black/10 
+                  border border-black/10
                   shadow-inner
                 "
               >
@@ -168,7 +168,7 @@ export default async function EditRolePage({ params }: { params: { id: string } 
                 className="
                   px-7 py-3 rounded-xl font-medium
                   bg-gradient-to-br from-indigo-500 to-indigo-600
-                  text-white 
+                  text-white
                   shadow-[0_4px_18px_rgba(0,0,0,0.18)]
                   hover:shadow-[0_6px_25px_rgba(0,0,0,0.22)]
                   hover:brightness-110
@@ -179,11 +179,9 @@ export default async function EditRolePage({ params }: { params: { id: string } 
                 Kaydet
               </button>
             </div>
-
           </div>
         </form>
-
       </div>
-    </ShellLayout>
+    </>
   );
 }

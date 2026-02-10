@@ -1,11 +1,10 @@
 // APP/app/admin/tasks/schedules/new/page.tsx
-export const dynamic = "force-dynamic"; // her zaman güncel veri
+export const dynamic = "force-dynamic";
 
 import ScheduleBuilder from "@/components/assign/ScheduleBuilder";
 import { supabaseServiceRoleClient } from "@/lib/supabase/server";
 import { getAdminContext } from "@/lib/admin/context";
 import { TemplateDTO, OperatorDTO } from "@/components/assign/types";
-
 
 /* ============================
    SERVER'DA VERİ YÜKLEME
@@ -42,15 +41,11 @@ async function getData(orgId: string) {
   return { templates, operators };
 }
 
-
 /* ============================
    PAGE COMPONENT
 =============================== */
 export default async function NewSchedulePage() {
-  const { org, member } = await getAdminContext();
-  if (!member || !org) {
-    throw new Error("Yetkisiz erişim");
-  }
+  const { org, member, access } = await getAdminContext();
 
   const { templates, operators } = await getData(member.org_id);
 
@@ -68,10 +63,9 @@ export default async function NewSchedulePage() {
       <ScheduleBuilder
         templates={templates}
         operators={operators}
-        isPremium={org.is_premium === true}
-        role={member.role_name}
+        isPremium={access.premium}   // ✅ trial + premium
+        role={member.role}           // ✅ role_name YOK
       />
     </div>
   );
 }
-

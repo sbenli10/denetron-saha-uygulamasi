@@ -1,3 +1,4 @@
+// APP/app/lib/admin/context.ts
 import { redirect } from "next/navigation";
 import {
   supabaseServerClient,
@@ -5,17 +6,18 @@ import {
 } from "@/lib/supabase/server";
 
 /**
- * ADMIN SERVER CONTEXT (HARDENED)
+ * ADMIN SERVER CONTEXT (FINAL)
  *
  * - Auth yoksa → login
  * - 1 kullanıcı = 1 aktif org (en yeni)
- * - Rol her zaman resolve edilir
- * - Bozuk veri → fail-closed
- * - TS strict uyumlu
+ * - Rol resolve edilir (RBAC safe)
+ * - Subscription SINGLE SOURCE OF TRUTH
+ * - Trial = Premium access
+ * - Fail-closed
  */
 export async function getAdminContext() {
   /* -------------------------------------------------- */
-  /* 1) AUTH (SERVER COOKIE)                            */
+  /* 1) AUTH                                            */
   /* -------------------------------------------------- */
   const supabase = supabaseServerClient();
   const {
@@ -30,9 +32,9 @@ export async function getAdminContext() {
   const admin = supabaseServiceRoleClient();
 
   /* -------------------------------------------------- */
-  /* 2) ORG MEMBERSHIP (TEK AKTİF KAYIT)                */
+  /* 2) ORG MEMBERSHIP                                  */
   /* -------------------------------------------------- */
-  const { data: member, error: memberError } = await admin
+  const { data: member } = await admin
     .from("org_members")
     .select("id, org_id, role, role_id, created_at")
     .eq("user_id", user.id)
@@ -41,19 +43,16 @@ export async function getAdminContext() {
     .limit(1)
     .maybeSingle();
 
-  if (memberError || !member || !member.org_id) {
-    // Üyelik yok veya bozuk → güvenli çıkış
+  if (!member?.org_id) {
     redirect("/login");
   }
 
   /* -------------------------------------------------- */
-  /* 3) ROLE RESOLUTION (TS + RBAC SAFE)                */
+  /* 3) ROLE RESOLUTION                                 */
   /* -------------------------------------------------- */
   type Role = "admin" | "manager" | "operator";
-
   let resolvedRole: string | null = null;
 
-  // 3.a roles tablosundan çöz
   if (member.role_id) {
     const { data: roleRow } = await admin
       .from("roles")
@@ -61,17 +60,15 @@ export async function getAdminContext() {
       .eq("id", member.role_id)
       .maybeSingle();
 
-    if (roleRow?.name && typeof roleRow.name === "string") {
+    if (roleRow?.name) {
       resolvedRole = roleRow.name.toLowerCase();
     }
   }
 
-  // 3.b fallback: org_members.role
   if (!resolvedRole && member.role) {
     resolvedRole = member.role.toLowerCase();
   }
 
-  // 3.c whitelist + default
   const effectiveRole: Role =
     resolvedRole === "admin" ||
     resolvedRole === "manager" ||
@@ -79,39 +76,58 @@ export async function getAdminContext() {
       ? resolvedRole
       : "operator";
 
-  // 3.d admin guard
   if (effectiveRole === "operator") {
     redirect("/operator");
   }
 
   /* -------------------------------------------------- */
-  /* 4) PROFILE (ZORUNLU)                               */
+  /* 4) PROFILE                                         */
   /* -------------------------------------------------- */
-  const { data: profile, error: profileError } = await admin
+  const { data: profile } = await admin
     .from("profiles")
     .select("id, full_name, email")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (profileError || !profile) {
+  if (!profile) {
     redirect("/login");
   }
 
   /* -------------------------------------------------- */
-  /* 5) ORGANIZATION (ZORUNLU)                          */
+  /* 5) ORGANIZATION                                    */
   /* -------------------------------------------------- */
-  const { data: org, error: orgError } = await admin
+  const { data: org } = await admin
     .from("organizations")
     .select("id, name, slug, is_premium")
     .eq("id", member.org_id)
     .maybeSingle();
 
-  if (orgError || !org) {
+  if (!org) {
     redirect("/login");
   }
 
   /* -------------------------------------------------- */
-  /* 6) ORG SETTINGS (OPSİYONEL)                        */
+  /* 6) SUBSCRIPTION (SOURCE OF TRUTH)                  */
+  /* -------------------------------------------------- */
+  const { data: subscription } = await admin
+    .from("org_subscriptions")
+    .select("plan, status, expires_at, trial_used")
+    .eq("org_id", member.org_id)
+    .maybeSingle();
+
+  const safeSubscription = subscription ?? {
+    plan: "free",
+    status: "active",
+    expires_at: null,
+    trial_used: false,
+  };
+
+  const hasPremiumAccess =
+    safeSubscription.plan === "trial" ||
+    safeSubscription.plan === "premium";
+
+  /* -------------------------------------------------- */
+  /* 7) ORG SETTINGS (OPTIONAL)                         */
   /* -------------------------------------------------- */
   const { data: settings } = await admin
     .from("org_settings")
@@ -120,7 +136,7 @@ export async function getAdminContext() {
     .maybeSingle();
 
   /* -------------------------------------------------- */
-  /* 7) STABLE RETURN                                   */
+  /* 8) RETURN (STABLE SHAPE)                           */
   /* -------------------------------------------------- */
   return {
     user,
@@ -137,7 +153,6 @@ export async function getAdminContext() {
       user_id: user.id,
       org_id: member.org_id,
       role: effectiveRole,
-      role_name: effectiveRole,
       created_at: member.created_at,
     },
 
@@ -145,8 +160,16 @@ export async function getAdminContext() {
       id: org.id,
       name: org.name,
       slug: org.slug,
-      is_premium: org.is_premium ?? false,
+      // ⚠️ legacy flag (UI hint only)
+      is_premium: hasPremiumAccess,
       settings: settings ?? null,
+    },
+
+    subscription: safeSubscription,
+
+    access: {
+      premium: hasPremiumAccess,
+      plan: safeSubscription.plan,
     },
   };
 }

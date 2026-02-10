@@ -1,9 +1,9 @@
+// APP/app/admin/ai/page.tsx
 export const dynamic = "force-dynamic";
 
 import { getAdminContext } from "@/lib/admin/context";
 import { supabaseServiceRoleClient } from "@/lib/supabase/server";
 import InsightsBoard from "./insights/ui/InsightsBoard";
-
 import PremiumRequired from "@/app/admin/_components/PremiumRequired";
 
 type SubmissionRow = {
@@ -21,19 +21,15 @@ type SubmissionRow = {
 };
 
 export default async function AdminAiPage() {
-  // 1) Admin + RBAC doğrulama
-  const { user, profile, member, org } = await getAdminContext();
+  /* 1) Admin Context (RBAC + Access) */
+  const { member, org, access } = await getAdminContext();
 
-  // 2) Premium CHECK — SAYFANIN ORTASINDA DEĞİL, EN BAŞTA
-  if (!org.is_premium) {
-    return (
-      
-        <PremiumRequired role={member.role_name} />
-
-    );
+  /* 2) PREMIUM GUARD — EN BAŞTA */
+  if (!access.premium) {
+    return <PremiumRequired role={member.role} />;
   }
 
-  // 3) Premium ise data çek
+  /* 3) DATA */
   const admin = supabaseServiceRoleClient();
 
   const { data, error } = await admin
@@ -48,25 +44,23 @@ export default async function AdminAiPage() {
 
   const submissions = (data ?? []) as SubmissionRow[];
 
-  // 4) Render
+  /* 4) RENDER */
   return (
-
-      <div className="space-y-8 mb-10">
-        {/* PAGE HEADER */}
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            AI İçgörüleri
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">
-            Yapay zeka tarafından otomatik işlenen saha gönderimlerini görüntüleyin.
-          </p>
-        </div>
-
-        {/* INSIGHTS */}
-        <div className="rounded-xl border border-border bg-card p-4">
-          <InsightsBoard submissions={submissions} />
-        </div>
+    <div className="space-y-8 mb-10">
+      {/* PAGE HEADER */}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          AI İçgörüleri
+        </h1>
+        <p className="text-sm text-foreground/60 mt-1">
+          Yapay zeka tarafından otomatik işlenen saha gönderimlerini görüntüleyin.
+        </p>
       </div>
 
+      {/* INSIGHTS */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <InsightsBoard submissions={submissions} />
+      </div>
+    </div>
   );
 }

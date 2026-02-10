@@ -79,27 +79,30 @@ type GroupedSession = {
 
 type DeviceItem = {
   id: string;
+  deviceHash: string;   // 🔥 EKLE
   name: string;
   platform?: string;
   lastSeenAt: string;
-  trusted?: boolean;
+  trusted: boolean;
 };
 
 
 
-function formatTimeTR(iso: string) {
-  try {
-    return new Date(iso).toLocaleString("tr-TR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
+
+function formatTimeTRSafe(iso?: string) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return isNaN(d.getTime())
+    ? "—"
+    : d.toLocaleString("tr-TR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 }
+
 
 function groupSessionsByDevice(
   rows: RawSessionRow[]
@@ -238,7 +241,7 @@ export default function SecuritySettings({
   orgId,
 }: SecuritySettingsProps) {
   const isAdmin = (role ?? "").toLowerCase() === "admin";
-
+  
   const [loading, setLoading] = useState(false);
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
@@ -451,15 +454,21 @@ async function onVerify2FA() {
     );
 
 
-    setDevices(
+   setDevices(
       deviceRows.map((d: any): DeviceItem => ({
         id: d.id,
-        name: d.label ?? "Bilinmeyen cihaz",
+        deviceHash: d.device_hash, // 🔥 BURASI
+        name: d.name,
         platform: d.platform,
-        lastSeenAt: d.last_seen_at,
+        lastSeenAt: d.lastSeenAt,
         trusted: d.trusted,
       }))
     );
+
+
+
+
+
   } finally {
     setLoading(false);
   }
@@ -489,12 +498,46 @@ async function onVerify2FA() {
   }
 
 
+  const [togglingDevice, setTogglingDevice] = useState<string | null>(null);
 
-  async function onToggleDevice(deviceId: string) {
+ async function onToggleDevice(deviceHash: string) {
     if (!isAdmin) return;
-    await toggleTrustedDevice(deviceId);
-    await loadData();
+
+    setTogglingDevice(deviceHash);
+
+    // 1️⃣ Optimistic UI
+    setDevices(prev =>
+      prev.map(d =>
+        d.deviceHash === deviceHash
+          ? { ...d, trusted: !d.trusted }
+          : d
+      )
+    );
+
+    try {
+      await toggleTrustedDevice(userId, orgId, deviceHash);
+    } catch (err) {
+      console.error("Toggle device failed", err);
+
+      // ❌ rollback
+      setDevices(prev =>
+        prev.map(d =>
+          d.deviceHash === deviceHash
+            ? { ...d, trusted: !d.trusted }
+            : d
+        )
+      );
+    } finally {
+      setTogglingDevice(null);
+
+      // 2️⃣ Final sync (tek kaynak DB)
+      await loadData();
+    }
   }
+
+
+
+
 
   /* ================= RENDER ================= */
 
@@ -520,127 +563,134 @@ async function onVerify2FA() {
         </button>
       </div>
 
-     {/* ================= 2FA ================= */}
-      <SectionShell
-        icon={KeyRound}
-        title="İki Aşamalı Doğrulama (2FA)"
-        description="Hesabınız için ek bir güvenlik katmanı"
-        right={
-          !isPremium && (
-            <span className="inline-flex items-center gap-1 text-xs">
-              <Crown className="h-4 w-4 text-amber-500" /> Premium
-            </span>
-          )
-        }
-      >
-        {!isPremium ? (
-          <PremiumRequired role={role} />
-        ) : (
-          <>
-            {/* ===== AÇIKLAMA (HER ZAMAN GÖRÜNÜR) ===== */}
-            <p className="text-sm text-foreground/60 leading-relaxed">
-              2FA etkinleştirildiğinde, hesabınıza giriş yaparken şifrenize ek olarak
-              telefonunuzdaki doğrulama uygulamasından üretilen 6 haneli bir kod istenir.
-              <br />
-              <span className="text-xs text-foreground/50">
-                Bu sayede şifreniz ele geçirilse bile hesabınız korunur.
-              </span>
+     {/* ================= GİRİŞ GÜVENLİĞİ (2FA) ================= */}
+    <SectionShell
+      icon={KeyRound}
+      title="Giriş Güvenliği (Telefonla Onay)"
+      description="Hesabınızı izinsiz girişlere karşı korur"
+      right={
+        !isPremium && (
+          <span className="inline-flex items-center gap-1 text-xs">
+            <Crown className="h-4 w-4 text-amber-500" /> Premium
+          </span>
+        )
+      }
+    >
+  {!isPremium ? (
+    <PremiumRequired role={role} />
+  ) : (
+    <>
+      {/* ===== AÇIKLAMA ===== */}
+      <p className="text-sm text-foreground/70 leading-relaxed">
+        Bu özellik açıkken hesabınıza giriş yaparken:
+        <br />
+        <strong>Şifrenizden sonra telefonunuzdan gelen tek kullanımlık bir kod</strong> sorulur.
+        <br />
+        <span className="text-xs text-foreground/50">
+          Böylece şifreniz başkalarının eline geçse bile hesabınıza girilemez.
+        </span>
+      </p>
+
+      {/* ===== AKTİF DEĞİL ===== */}
+      {!twoFAEnabled && !enrolling2FA && (
+        <div className="pt-4 space-y-2">
+          <button
+            disabled={!sessionReady}
+            onClick={start2FAEnrollment}
+            className="
+              h-10 px-4 rounded-xl
+              bg-primary text-primary-foreground
+              disabled:opacity-50 disabled:cursor-not-allowed
+            "
+          >
+            Telefonla Giriş Güvenliğini Aç
+          </button>
+
+          <p className="text-xs text-foreground/50">
+            Kurulum 1 dakikadan kısa sürer.
+          </p>
+
+          {!sessionReady && (
+            <p className="text-xs text-foreground/50">
+              Oturum doğrulanıyor, lütfen bekleyin…
             </p>
+          )}
+        </div>
+      )}
 
-            {/* ===== 2FA AKTİF DEĞİL ===== */}
-            {!twoFAEnabled && !enrolling2FA && (
-              <div className="pt-3">
-                <button
-                  disabled={!sessionReady}
-                  onClick={start2FAEnrollment}
-                  className="
-                    h-10 px-4 rounded-xl
-                    bg-primary text-primary-foreground
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                  "
-                >
-                  2FA’yı Etkinleştir
-                </button>
+      {/* ===== KURULUM (QR + KOD) ===== */}
+      {enrolling2FA && factorId && challengeId && (
+        <div className="space-y-4 mt-6">
+          {qrCode && (
+            <div className="flex flex-col items-center gap-2">
+              <img
+                src={qrCode}
+                alt="Güvenlik Kodu"
+                className="w-40 h-40"
+              />
+              <p className="text-xs text-foreground/60 text-center">
+                Telefonunuza bir doğrulama uygulaması yükleyip bu kodu okutun.
+                <br />
+                (Google Authenticator, Microsoft Authenticator vb.)
+              </p>
+            </div>
+          )}
 
-                {!sessionReady && (
-                  <p className="mt-2 text-xs text-foreground/50">
-                    Oturum doğrulanıyor, lütfen bekleyin…
-                  </p>
-                )}
-              </div>
-            )}
+          <input
+            value={otp}
+            onChange={(e) => setOtp(e.target.value)}
+            placeholder="Telefondaki 6 haneli kod"
+            inputMode="numeric"
+            maxLength={6}
+            className="h-10 w-full rounded-xl border px-3"
+          />
 
-            {/* ===== 2FA ENROLL (QR + KOD) ===== */}
-            {enrolling2FA && factorId && challengeId && (
-              <div className="space-y-4 mt-6">
-                {qrCode && (
-                  <div className="flex flex-col items-center gap-2">
-                    <img
-                      src={qrCode}
-                      alt="2FA QR Code"
-                      className="w-40 h-40"
-                    />
-                    <p className="text-xs text-foreground/60 text-center">
-                      Google Authenticator veya benzeri bir uygulama ile QR kodu okutun
-                    </p>
-                  </div>
-                )}
+          <div className="flex gap-2">
+            <button
+              onClick={onVerify2FA}
+              disabled={verifying || otp.length !== 6}
+              className="
+                flex-1 h-10 rounded-xl
+                bg-emerald-600 text-white
+                disabled:opacity-50
+              "
+            >
+              {verifying ? "Kontrol ediliyor…" : "Onayla"}
+            </button>
 
-                <input
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  placeholder="6 haneli doğrulama kodu"
-                  inputMode="numeric"
-                  maxLength={6}
-                  className="h-10 w-full rounded-xl border px-3"
-                />
+            <button
+              onClick={async () => {
+                if (factorId) {
+                  await supabase.auth.mfa.unenroll({ factorId });
+                }
+                reset2FAState();
+              }}
+              className="h-10 px-4 rounded-xl border text-sm"
+            >
+              Vazgeç
+            </button>
+          </div>
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={onVerify2FA}
-                    disabled={verifying || otp.length !== 6}
-                    className="
-                      flex-1 h-10 rounded-xl
-                      bg-emerald-600 text-white
-                      disabled:opacity-50
-                    "
-                  >
-                    {verifying ? "Doğrulanıyor…" : "Doğrula"}
-                  </button>
+          <p className="text-xs text-foreground/50 text-center">
+            Bu adım tamamlanmadan güvenlik aktif olmaz.
+          </p>
+        </div>
+      )}
 
-                  <button
-                    onClick={async () => {
-                      if (factorId) {
-                        await supabase.auth.mfa.unenroll({ factorId });
-                      }
-                      reset2FAState();
-                    }}
-                    className="h-10 px-4 rounded-xl border text-sm"
-                  >
-                    Vazgeç
-                  </button>
-                </div>
-
-                <p className="text-xs text-foreground/50 text-center">
-                  Doğrulama tamamlanmadan 2FA aktif hale gelmez.
-                </p>
-              </div>
-            )}
-
-            {/* ===== 2FA AKTİF ===== */}
-            {twoFAEnabled && (
-              <div className="mt-4 space-y-1">
-                <div className="text-sm text-emerald-600 font-medium">
-                  2FA aktif
-                </div>
-                <p className="text-xs text-foreground/60">
-                  Hesabınıza girişlerde artık doğrulama kodu istenecektir.
-                </p>
-              </div>
-            )}
-          </>
-        )}
-      </SectionShell>
+      {/* ===== AKTİF ===== */}
+      {twoFAEnabled && (
+        <div className="mt-4 space-y-1">
+          <div className="text-sm text-emerald-600 font-medium">
+            Telefonla giriş güvenliği açık
+          </div>
+          <p className="text-xs text-foreground/60">
+            Yeni bir cihazdan giriş yaparken telefonunuza doğrulama kodu sorulur.
+          </p>
+        </div>
+      )}
+    </>
+  )}
+</SectionShell>
 
 
 
@@ -697,7 +747,7 @@ async function onVerify2FA() {
               </div>
 
               <div className="text-xs text-foreground/60">
-                Son aktivite: {formatTimeTR(d.lastSeenAt)}
+                Son aktivite: {formatTimeTRSafe(d.lastSeenAt)}
               </div>
 
               <div className="text-xs text-foreground/60">
@@ -753,17 +803,31 @@ async function onVerify2FA() {
                 <div>
                   <div className="font-medium">{d.name}</div>
                   <div className="text-xs text-foreground/60">
-                    {d.platform} • {formatTimeTR(d.lastSeenAt)}
+                    {d.platform} • {formatTimeTRSafe(d.lastSeenAt)}
                   </div>
                 </div>
 
                 {isAdmin && (
-                  <button
-                    onClick={() => onToggleDevice(d.id)}
-                    className="h-9 px-3 rounded-xl border text-sm"
-                  >
-                    {d.trusted ? "Güvenilir" : "Standart"}
-                  </button>
+                <button
+                  type="button"
+                  disabled={togglingDevice === d.deviceHash}
+                  onClick={() => onToggleDevice(d.deviceHash)}
+                  className={cn(
+                    "h-9 min-w-[120px] px-4 rounded-xl text-sm font-medium transition-all",
+                    "border focus:outline-none focus:ring-2 focus:ring-offset-2",
+                    d.trusted
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 focus:ring-emerald-400"
+                      : "bg-background text-foreground border-border hover:bg-accent focus:ring-primary",
+                    togglingDevice === d.deviceHash && "opacity-60 cursor-not-allowed"
+                  )}
+                >
+                  {togglingDevice === d.deviceHash
+                    ? "Güncelleniyor…"
+                    : d.trusted
+                      ? "Güvenilir"
+                      : "Standart"}
+                </button>
+
                 )}
               </div>
             ))}

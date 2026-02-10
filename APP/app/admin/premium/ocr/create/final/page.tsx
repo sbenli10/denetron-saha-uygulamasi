@@ -80,7 +80,7 @@ export default function PremiumOCRFinalPage() {
             Alan tiplerini veya kritik işaretlerini manuel olarak güncelleyebilirsiniz.
           </li>
           <li>
-            Şablonu OCR işlemlerinde aktif olarak kullanabilirsiniz.
+            Şablonu Saha Denetim işlemlerinde aktif olarak kullanabilirsiniz.
           </li>
         </ul>
       </section>

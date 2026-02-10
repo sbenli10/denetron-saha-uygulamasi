@@ -40,14 +40,39 @@ export async function getDevices(userId: string, orgId: string) {
 
   const { data, error } = await admin
     .from("devices")
-    .select("*")
+    .select(`
+      id,
+      device_hash,
+      label,
+      platform,
+      last_seen_at,
+      trusted_devices!left (
+        trusted_until
+      )
+    `)
     .eq("user_id", userId)
     .eq("org_id", orgId)
     .order("last_seen_at", { ascending: false });
 
   if (error) throw error;
-  return data ?? [];
+
+  return (data ?? []).map((d: any) => ({
+    id: d.id,
+    device_hash: d.device_hash, // 🔥 KRİTİK
+    name: d.label ?? "Bilinmeyen cihaz",
+    platform: d.platform,
+    lastSeenAt: d.last_seen_at,
+    trusted:
+      !!(
+        d.trusted_devices?.trusted_until &&
+        new Date(d.trusted_devices.trusted_until).getTime() > Date.now()
+      ),
+  }));
 }
+
+
+
+
 
 /* =====================================================
  * 🔐 TEK OTURUM KAPAT
@@ -98,18 +123,48 @@ export async function revokeAllSessionsExceptCurrent(
  * ===================================================== */
 
 /**
- * Cihazın trusted durumunu tersine çevirir
- * DB tarafında RPC kullanılır
+ * Cihazın trusted durumunu kaldırır (revoke)
+ * RPC: toggle_device_trust(user_id, org_id, device_hash)
  */
-export async function toggleTrustedDevice(deviceId: string) {
+export async function toggleTrustedDevice(
+  userId: string,
+  orgId: string,
+  deviceHash: string
+) {
   const admin = supabaseServiceRoleClient();
 
-  const { error } = await admin.rpc("toggle_device_trust", {
-    device_id: deviceId,
+  console.log("[SERVER] toggleTrustedDevice called", {
+    userId,
+    orgId,
+    deviceHash,
   });
 
-  if (error) throw error;
+  const { data: existing } = await admin
+    .from("trusted_devices")
+    .select("id, trusted_until")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .eq("device_hash", deviceHash)
+    .maybeSingle();
+
+  console.log("[SERVER] existing trusted device", existing);
+
+  if (existing) {
+    console.log("[SERVER] removing trust");
+    await admin.from("trusted_devices").delete().eq("id", existing.id);
+  } else {
+    console.log("[SERVER] adding trust");
+    await admin.from("trusted_devices").insert({
+      user_id: userId,
+      org_id: orgId,
+      device_hash: deviceHash,
+      trusted_until: new Date(
+        Date.now() + 30 * 24 * 60 * 60 * 1000
+      ).toISOString(),
+    });
+  }
 }
+
 
 /* =====================================================
  * 🟢 LAST SEEN GÜNCELLE (SESSION BAZLI)

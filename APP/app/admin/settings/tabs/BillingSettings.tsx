@@ -1,100 +1,154 @@
 "use client";
 
 import { useState } from "react";
-import { CreditCard, Crown, Sparkles } from "lucide-react";
+import {
+  CreditCard,
+  Crown,
+  Sparkles,
+  Timer,
+} from "lucide-react";
 
 import PlanCard from "../_components/PlanCard";
 import PlanComparison from "../_components/PlanComparison";
 import { startTrial } from "../actions/billingActions";
+import TrialBanner from "../_components/TrialBanner";
 
-interface BillingSettingsProps {
-  isPremium: boolean;
-  role: string;
+/* ================================
+   TYPES
+================================ */
+
+interface Subscription {
+  plan: "free" | "trial" | "premium";
+  status: "active" | "expired" | "cancelled";
+  trial_used: boolean;
+  expires_at: string | null;
 }
 
+interface BillingSettingsProps {
+  role: string;
+  subscription: Subscription;
+}
+
+/* ================================
+   HELPERS
+================================ */
+
+
+/* ================================
+   COMPONENT
+================================ */
+
 export default function BillingSettings({
-  isPremium,
   role,
+  subscription,
 }: BillingSettingsProps) {
   const [loading, setLoading] = useState(false);
 
+  const isAdmin = role === "admin";
+  const isPremium = subscription.plan === "premium";
+  const isTrial = subscription.plan === "trial";
+
+  const canStartTrial =
+    isAdmin &&
+    subscription.plan === "free" &&
+    !subscription.trial_used &&
+    subscription.status === "active";
+
   async function handleStartTrial() {
+    if (!canStartTrial || loading) return;
+
     setLoading(true);
     const res = await startTrial();
     setLoading(false);
 
-    if (res?.error) {
+    if ("error" in res) {
       alert(res.error);
-    } else {
-      window.location.reload();
+      return;
     }
+
+    window.location.reload();
   }
 
-  const isAdmin = role === "admin";
+  
+
+  /* ================================
+     STATUS CONTENT
+  ================================ */
+
+  function getStatusContent() {
+    if (isPremium) {
+      return {
+        title: "Premium plan aktif",
+        description:
+          "Tüm premium özelliklere sınırsız erişiminiz var.",
+        icon: <Crown className="text-amber-500" />,
+      };
+    }
+    return {
+      title: "Ücretsiz plan",
+      description: subscription.trial_used
+        ? "Deneme süresi daha önce kullanıldı."
+        : "Premium özellikleri denemek için deneme başlatabilirsiniz.",
+      icon: <CreditCard className="text-slate-500" />,
+    };
+  }
+
+  const status = getStatusContent();
+
+  /* ================================
+     RENDER
+  ================================ */
 
   return (
     <div className="space-y-12 max-w-7xl">
-      {/* ================= HEADER ================= */}
+      {/* HEADER */}
       <div className="space-y-2">
         <h2 className="text-2xl font-semibold tracking-tight">
           Plan & Faturalama
         </h2>
         <p className="text-sm text-muted-foreground max-w-2xl">
-          Mevcut planınızı görüntüleyin, deneme sürecini başlatın veya
-          premium özelliklere geçiş yapın.
+          Planınızı yönetin, deneme sürecini başlatın veya
+          premium pakete geçin.
         </p>
       </div>
 
-      {/* ================= STATUS BANNER ================= */}
-      <div
-        className="
-          flex items-center justify-between gap-4
-          rounded-2xl border border-border
-          bg-muted/40 px-5 py-4
-        "
-      >
+      {/* TRIAL BANNER */}
+      {subscription.plan === "trial" &&
+        subscription.expires_at && (
+          <TrialBanner
+            expiresAt={subscription.expires_at}
+          />
+      )}
+      {/* STATUS */}
+      <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-muted/40 px-5 py-4">
         <div className="flex items-center gap-3">
-          {isPremium ? (
-            <Crown className="text-amber-500" />
-          ) : (
-            <CreditCard className="text-slate-500" />
-          )}
-
+          {status.icon}
           <div>
             <p className="text-sm font-medium">
-              {isPremium
-                ? "Premium plan aktif"
-                : "Ücretsiz plan kullanıyorsunuz"}
+              {status.title}
             </p>
             <p className="text-xs text-muted-foreground">
-              {isPremium
-                ? "Tüm premium özelliklere erişiminiz var."
-                : "Premium özellikleri denemek için deneme başlatabilirsiniz."}
+              {status.description}
             </p>
           </div>
         </div>
 
-        {!isPremium && isAdmin && (
+        {canStartTrial && (
           <button
             onClick={handleStartTrial}
             disabled={loading}
-            className="
-              inline-flex items-center gap-2
-              rounded-xl bg-indigo-600 px-4 py-2
-              text-sm font-medium text-white
-              hover:bg-indigo-700 transition
-              disabled:opacity-60
-            "
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
           >
             <Sparkles size={16} />
-            {loading ? "Başlatılıyor…" : "7 Günlük Deneme Başlat"}
+            {loading
+              ? "Başlatılıyor…"
+              : "7 Günlük Deneme Başlat"}
           </button>
         )}
       </div>
 
-      {/* ================= PLANS ================= */}
+      {/* PLANS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* FREE */}
         <PlanCard
           title="Free"
           price="₺0"
@@ -105,42 +159,30 @@ export default function BillingSettings({
           ]}
         />
 
-        {/* TRIAL */}
         <PlanCard
           title="Deneme (7 Gün)"
           price="Ücretsiz"
           highlighted
           features={[
             "Tüm premium özellikler",
-            "IBYS / e-Reçete entegrasyonu",
-            "Sınırsız rapor",
-            "Otomatik Denetim Şablonu",
-            "Sınırsız Denetim Raporu",
-            "Yapay Zeka ile Rapor Analizi",
-            "Yapay Zeka İş Asistanı",
+            "DÖF Raporlama Sistemi",
+            "Dosya arşivleme",
+            "2FA güvenlik",
+            "Yapay zeka destekli analiz",
           ]}
           action={
-            !isPremium && isAdmin ? (
+            canStartTrial ? (
               <button
                 onClick={handleStartTrial}
                 disabled={loading}
-                className="
-                  w-full mt-4
-                  rounded-xl bg-indigo-600 px-4 py-2
-                  text-sm font-medium text-white
-                  hover:bg-indigo-700 transition
-                  disabled:opacity-60
-                "
+                className="w-full mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
               >
-                {loading
-                  ? "Başlatılıyor…"
-                  : "7 Günlük Denemeyi Başlat"}
+                Denemeyi Başlat
               </button>
             ) : null
           }
         />
 
-        {/* PREMIUM */}
         <PlanCard
           title="Premium"
           price="Teklif Al"
@@ -148,22 +190,11 @@ export default function BillingSettings({
             "Sınırsız denetim",
             "Tüm entegrasyonlar",
             "Öncelikli destek",
-            "Otomatik Denetim Şablonu",
-            "Sınırsız Denetim Raporu",
-            "Yapay Zeka ile Rapor Analizi",
-            "Yapay Zeka İş Asistanı",
+            "Kurumsal raporlama",
           ]}
           action={
             isAdmin && !isPremium ? (
-              <button
-                className="
-                  w-full mt-4
-                  rounded-xl border border-indigo-600
-                  px-4 py-2 text-sm font-medium
-                  text-indigo-600
-                  hover:bg-indigo-50 transition
-                "
-              >
+              <button className="w-full mt-4 rounded-xl border border-indigo-600 px-4 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 transition">
                 Satış Ekibiyle İletişime Geç
               </button>
             ) : null
@@ -171,10 +202,7 @@ export default function BillingSettings({
         />
       </div>
 
-      {/* ================= COMPARISON ================= */}
-      <div>
-        <PlanComparison />
-      </div>
+      <PlanComparison />
     </div>
   );
 }

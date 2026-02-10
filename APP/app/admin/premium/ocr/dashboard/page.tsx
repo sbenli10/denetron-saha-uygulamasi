@@ -127,7 +127,7 @@ export default function ISGAssistantDashboard() {
 
           <ul className="space-y-4 text-gray-700 dark:text-[#A0A7B8]">
             <li>• Yıllık planlarda eksik veya mevzuata aykırı noktaları bulur</li>
-            <li>• DÖF’leri otomatik üretir ve risk seviyelendirir</li>
+            <li>• Düzenleyici Önleyici Faaliyet Raporu otomatik üretir ve risk seviyelendirir</li>
             <li>• Eğitim tekrar sürelerini ve zorunlulukları kontrol eder</li>
             <li>• Denetimde sorulacak sorulara hazır hale getirir</li>
           </ul>
@@ -148,7 +148,7 @@ function Hero() {
       </h1>
       <p className="max-w-3xl text-xl text-gray-600 dark:text-[#A0A7B8]">
         Yıllık İSG planları, eğitim dokümanları ve DÖF süreçlerini
-        yapay zekâ ile analiz edin, denetime hazır hale gelin.
+        Yapay zekâ ile analiz edin, denetime hazır hale gelin.
       </p>
     </section>
   );

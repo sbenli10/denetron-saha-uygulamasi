@@ -5,7 +5,7 @@ import { getAdminContext } from "@/lib/admin/context";
 import { supabaseServiceRoleClient } from "@/lib/supabase/server";
 
 export async function loadTaskData() {
-  const { member, org } = await getAdminContext();
+  const { member, org, access } = await getAdminContext();
 
   if (!member || !org) {
     throw new Error("Organizasyon bilgisi bulunamadı.");
@@ -14,7 +14,7 @@ export async function loadTaskData() {
   const db = supabaseServiceRoleClient();
 
   /* -----------------------------
-     1) Templates (SADECE ATANABİLİRLER)
+     1) Templates
      KURAL: is_active = true AND is_archived = false
   ----------------------------- */
   const templatesRes = await db
@@ -40,7 +40,7 @@ export async function loadTaskData() {
   ----------------------------- */
   const operatorsRes = await db
     .from("org_members")
-    .select("user_id, role")
+    .select("user_id")
     .eq("org_id", member.org_id)
     .eq("role", "operator");
 
@@ -59,7 +59,9 @@ export async function loadTaskData() {
     .select("id, full_name, email")
     .in(
       "id",
-      operatorIds.length ? operatorIds : ["00000000-0000-0000-0000-000000000000"]
+      operatorIds.length
+        ? operatorIds
+        : ["00000000-0000-0000-0000-000000000000"]
     );
 
   if (profilesRes.error) {
@@ -71,16 +73,21 @@ export async function loadTaskData() {
     profilesRes.data.map((p) => [p.id, p])
   );
 
-  const operators = operatorsRes.data.map((o) => ({
-    id: o.user_id,
-    full_name: profileMap[o.user_id]?.full_name ?? "Operatör",
-    email: profileMap[o.user_id]?.email ?? null,
+  const operators = operatorIds.map((id) => ({
+    id,
+    full_name: profileMap[id]?.full_name ?? "Operatör",
+    email: profileMap[id]?.email ?? null,
   }));
 
+  /* -----------------------------
+     4) STABLE RETURN
+  ----------------------------- */
   return {
     templates,
     operators,
-    isPremium: org.is_premium,
+    access: {
+      premium: access.premium, // ✅ trial + premium = true
+    },
     role: member.role,
   };
 }

@@ -65,7 +65,7 @@ export default function PremiumOCRSavePage() {
           Şablonu Kaydet
         </h1>
         <p className="text-base text-gray-600">
-          Oluşturulan OCR şablonunu kaydetmeden önce alanları ön izleyin.
+          Oluşturulan Denetim şablonunu kaydetmeden önce alanları ön izleyin.
         </p>
       </header>
 

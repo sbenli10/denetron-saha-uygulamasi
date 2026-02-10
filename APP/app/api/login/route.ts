@@ -1,3 +1,4 @@
+//APP\app\api\login\route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,8 @@ export async function POST(req: Request) {
     );
   }
 
+  
+
   // 🔒 Buradan sonrası GUARANTEED SAFE
   const user = data.user;
   const session = data.session;
@@ -131,119 +134,143 @@ export async function POST(req: Request) {
 
     const mfaRequiredByOrg = orgSettings?.mfa_required === true;
 
-// 3️⃣ Device hash (tek yerde)
-const userAgent = req.headers.get("user-agent") ?? "unknown";
-const parsed = parseDevice(userAgent);
-const deviceHash = hashDevice(userAgent, parsed.os);
+    /**
+     * 3️⃣ DEVICE CONTEXT
+     * - UA sadece bilgi/log için kullanılır
+     * - device_hash ASLA burada yeniden üretilmez
+     */
+    const userAgent = req.headers.get("user-agent") ?? "unknown";
+    const parsed = parseDevice(userAgent);
 
-// 4️⃣ Device upsert + session logs
-await admin
-  .from("devices")
-  .upsert(
-    {
+    // 🔑 device_hash sadece cookie'den okunur
+    const cookie = req.headers.get("cookie") ?? "";
+    const deviceHash =
+      cookie.match(/device_hash=([^;]+)/)?.[1] ?? null;
+
+    console.log("LOGIN DEVICE", {
+      deviceHash,
+      ua: userAgent,
+      os: parsed.os,
+    });
+
+    /**
+     * 4️⃣ DEVICE UPSERT + SESSION LOGS
+     * (hash varsa cihaz tanınır, yoksa ilk login kabul edilir)
+     */
+    if (deviceHash) {
+      await admin
+        await admin.from("devices").upsert(
+        {
+          user_id: user.id,
+          org_id: member.org_id,
+          device_hash: deviceHash,
+          label: parsed.label,   // 🔥 BUNU YAZ
+          platform: parsed.os,
+          last_seen_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,org_id,device_hash" }
+      );
+    }
+
+    await admin
+      .from("device_sessions")
+      .update({ is_current: false })
+      .eq("user_id", user.id);
+
+    await admin.from("device_sessions").insert({
       user_id: user.id,
       org_id: member.org_id,
-      device_hash: deviceHash,
-      label: parsed.label,
+      session_id: data.session.refresh_token,
+      agent: userAgent,
       platform: parsed.os,
+      ip,
+      is_current: true,
       last_seen_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,device_hash" }
-  );
+    });
 
-await admin
-  .from("device_sessions")
-  .update({ is_current: false })
-  .eq("user_id", user.id);
+    /**
+     * 5️⃣ MFA STATE — SINGLE SOURCE OF TRUTH
+     */
+    const hasUserMfa = totpFactors.length > 0;
+    let isTrusted = false;
 
-await admin.from("device_sessions").insert({
-  user_id: user.id,
-  org_id: member.org_id,
-  session_id: data.session.refresh_token,
-  agent: userAgent,
-  platform: parsed.os,
-  ip,
-  is_current: true,
-  last_seen_at: new Date().toISOString(),
-});
+    /**
+     * 6️⃣ TRUSTED DEVICE CHECK
+     * (SADECE cookie’de device_hash varsa)
+     */
+    if (hasUserMfa && deviceHash) {
+      const { data: trusted, error } = await admin
+        .from("trusted_devices")
+        .select("trusted_until")
+        .eq("user_id", user.id)
+        .eq("org_id", member.org_id)   // ❗ KRİTİK
+        .eq("device_hash", deviceHash)
+        .maybeSingle();
 
-// 5️⃣ MFA STATE — SINGLE SOURCE OF TRUTH
-const hasUserMfa = totpFactors.length > 0;
-let isTrusted = false;
+      if (trusted?.trusted_until) {
+        const stillValid =
+          new Date(trusted.trusted_until).getTime() > Date.now();
 
-// 6️⃣ Trusted device check (SADECE MFA varsa)
-if (hasUserMfa) {
-  const { data: trusted, error: trustedErr } = await admin
-    .from("trusted_devices")
-    .select("trusted_until")
-    .eq("user_id", user.id)
-    .eq("device_hash", deviceHash)
-    .maybeSingle();
+        if (stillValid) {
+          isTrusted = true;
+        }
+      }
+    }
 
-  if (trustedErr) {
-    console.warn("⚠️ trusted_devices lookup failed", trustedErr.message);
+
+
+  // 7️⃣ MFA KARARI (NET VE TEK)
+  const shouldAskMfa = hasUserMfa && !isTrusted;
+
+  console.log("🧠 MFA DECISION", {
+    userId: user.id,
+    hasUserMfa,
+    isTrusted,
+    mfaRequiredByOrg,
+    shouldAskMfa,
+  });
+
+  // 🔐 MFA GEREKİYOR → OTP
+  if (shouldAskMfa) {
+    return NextResponse.json(
+      {
+        ok: true,
+        mfaRequired: true,
+        role: member.role,
+        orgId: member.org_id,
+      },
+      { status: 200 }
+    );
   }
 
-  if (
-    trusted?.trusted_until &&
-    new Date(trusted.trusted_until).getTime() > Date.now()
-  ) {
-    isTrusted = true;
-  }
-}
-
-// 7️⃣ MFA KARARI (NET VE TEK)
-const shouldAskMfa = hasUserMfa && !isTrusted;
-
-console.log("🧠 MFA DECISION", {
-  userId: user.id,
-  hasUserMfa,
-  isTrusted,
-  mfaRequiredByOrg,
-  shouldAskMfa,
-});
-
-// 🔐 MFA GEREKİYOR → OTP
-if (shouldAskMfa) {
-  return NextResponse.json(
+  // ✅ MFA GEREKMİYOR → COOKIE YAZ
+  const res = NextResponse.json(
     {
       ok: true,
-      mfaRequired: true,
+      mfaRequired: false,
       role: member.role,
       orgId: member.org_id,
     },
     { status: 200 }
   );
-}
 
-// ✅ MFA GEREKMİYOR → COOKIE YAZ
-const res = NextResponse.json(
-  {
-    ok: true,
-    mfaRequired: false,
-    role: member.role,
-    orgId: member.org_id,
-  },
-  { status: 200 }
-);
+  res.cookies.set("mfa_ok", "1", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 2,
+  });
 
-res.cookies.set("mfa_ok", "1", {
-  httpOnly: true,
-  sameSite: "lax",
-  secure: process.env.NODE_ENV === "production",
-  path: "/",
-  maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 2,
-});
+  console.log("✅ Login completed (MFA skipped)");
+  return res;
 
-console.log("✅ Login completed (MFA skipped)");
-return res;
-
-} catch (err) {
-  console.error("[LOGIN ERROR]", err);
-  return NextResponse.json(
-    { error: "Internal Server Error" },
-    { status: 500 }
-  );
-}
+  } catch (err) {
+    console.error("[LOGIN ERROR]", err);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
 
 }

@@ -1,3 +1,4 @@
+//APP\app\admin\upgrade\success\page.tsx
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 

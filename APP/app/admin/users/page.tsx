@@ -1,7 +1,6 @@
 // APP/app/admin/users/page.tsx
 export const dynamic = "force-dynamic";
 
-import ShellLayout from "@/components/layout/admin/shell/ShellLayout";
 import { getAdminContext } from "@/lib/admin/context";
 import { supabaseServiceRoleClient } from "@/lib/supabase/server";
 import PendingInvites from "./PendingInvites";
@@ -16,7 +15,7 @@ export default async function AdminUsersPage() {
   const admin = supabaseServiceRoleClient();
 
   /* ---------------------------------------------------------
-     0 — 🔔 PENDING INVITE COUNT (NEW)
+     0 — 🔔 PENDING INVITE COUNT
   --------------------------------------------------------- */
   const now = new Date().toISOString();
 
@@ -88,7 +87,7 @@ export default async function AdminUsersPage() {
      PAGE RENDER
   --------------------------------------------------------- */
   return (
-    <ShellLayout>
+    <>
       {/* Background effects */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden isolation-isolate">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.65),rgba(235,238,245,0.40),rgba(215,218,230,0.25))]" />
@@ -106,18 +105,21 @@ export default async function AdminUsersPage() {
 
               {/* 🔔 BADGE */}
               {inviteCount > 0 && (
-                <span className="
-                  text-sm font-medium
-                  px-3 py-1 rounded-full
-                  bg-[#6366F1]/10 text-[#6366F1]
-                ">
+                <span
+                  className="
+                    text-sm font-medium
+                    px-3 py-1 rounded-full
+                    bg-[#6366F1]/10 text-[#6366F1]
+                  "
+                >
                   {inviteCount}
                 </span>
               )}
             </h1>
 
             <p className="text-[13px] text-black/50 mt-2">
-              Organizasyondaki tüm kullanıcıları yönetin, filtreleyin ve yönlendirin.
+              Organizasyondaki tüm kullanıcıları yönetin, filtreleyin ve
+              yönlendirin.
             </p>
           </div>
 
@@ -150,6 +152,6 @@ export default async function AdminUsersPage() {
           </div>
         </div>
       </div>
-    </ShellLayout>
+    </>
   );
 }

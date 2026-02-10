@@ -1,3 +1,4 @@
+//APP\app\components\ui\sheet.tsx
 "use client";
 
 import * as React from "react";
@@ -117,6 +118,7 @@ export {
   SheetTrigger,
   SheetClose,
   SheetContent,
+  SheetOverlay, // 👈 BUNU EKLE
   SheetHeader,
   SheetFooter,
   SheetTitle,

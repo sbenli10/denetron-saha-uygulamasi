@@ -1,3 +1,4 @@
+//APP\app\admin\settings\_components\PlanComparison.tsx
 "use client";
 
 import { Check, X, Crown, Sparkles } from "lucide-react";

@@ -1,15 +1,13 @@
-//APP\app\admin\roles\page.tsx
+// APP/app/admin/roles/page.tsx
 export const dynamic = "force-dynamic";
 
 import { getAdminContext } from "@/lib/admin/context";
-import ShellLayout from "@/components/layout/admin/shell/ShellLayout";
 import PremiumRequired from "@/app/admin/_components/PremiumRequired";
 import { supabaseServiceRoleClient } from "@/lib/supabase/server";
 
 import { CreateRoleModal } from "./CreateRoleModal";
 import { EditRoleModal } from "./[id]/EditRoleModal";
 import DeleteRoleDialog from "./DeleteRoleDialog";
-
 
 export default async function AdminRolesPage() {
   const { member, org } = await getAdminContext();
@@ -22,15 +20,11 @@ export default async function AdminRolesPage() {
     .order("created_at", { ascending: false });
 
   if (!org?.is_premium) {
-    return (
-
-        <PremiumRequired role={member.role} />
-
-    );
+    return <PremiumRequired role={member.role} />;
   }
 
   return (
-    <ShellLayout>
+    <>
       {/* Background */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.65),rgba(235,238,245,0.4))]" />
@@ -105,6 +99,6 @@ export default async function AdminRolesPage() {
           </table>
         </div>
       </div>
-    </ShellLayout>
+    </>
   );
 }

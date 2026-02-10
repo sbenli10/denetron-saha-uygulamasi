@@ -2,6 +2,7 @@
 export const dynamic = "force-dynamic";
 
 import { supabaseServerClient } from "@/lib/supabase/server";
+import { supabaseServiceRoleClient } from "@/lib/supabase/server";
 import { getAdminContext } from "@/lib/admin/context";
 
 import SettingsLayout from "./_components/SettingsLayout";
@@ -23,22 +24,44 @@ export default async function SettingsPage({
   searchParams,
 }: SettingsPageProps) {
   /* ================= AUTH USER ================= */
-const supabase = supabaseServerClient();
-const { data } = await supabase.auth.getUser();
+  const supabase = supabaseServerClient();
+  const { data } = await supabase.auth.getUser();
 
-if (!data.user) {
-  throw new Error("Unauthorized");
-}
+  if (!data.user) {
+    throw new Error("Unauthorized");
+  }
 
-const user = data.user; // ✅ artık TS için kesin non-null
-
+  const user = data.user;
 
   /* ================= ADMIN CONTEXT ================= */
-  const { org, member } = await getAdminContext();
+  const { org, member, access } = await getAdminContext();
 
-  const isPremium = org.is_premium === true;
+  /* ================= SUBSCRIPTION ================= */
+  const admin = supabaseServiceRoleClient();
+
+  const { data: subscription } = await admin
+    .from("org_subscriptions")
+    .select("plan, status, trial_used, expires_at")
+    .eq("org_id", org.id)
+    .maybeSingle();
+
+  /**
+   * Fallback:
+   * - Eski premium org’lar
+   * - Henüz subscription kaydı olmayanlar
+   */
+  const safeSubscription = subscription ?? {
+    plan: access.premium ? "premium" : "free",
+    status: "active",
+    trial_used: false,
+    expires_at: null,
+  };
+
+  const isPremium = access.premium; // ✅ TEK KAYNAK
+
   const activeTab: SettingsTabKey = searchParams?.tab ?? "general";
 
+  /* ================= TAB RENDER ================= */
   function renderTabContent() {
     switch (activeTab) {
       case "general":
@@ -58,16 +81,16 @@ const user = data.user; // ✅ artık TS için kesin non-null
           <SecuritySettings
             isPremium={isPremium}
             role={member.role}
-            userId={user.id}       // ✅ Auth user ID
-            orgId={member.org_id}  // ✅ Member org ID
+            userId={user.id}
+            orgId={member.org_id}
           />
         );
 
       case "billing":
         return (
           <BillingSettings
-            isPremium={isPremium}
             role={member.role}
+            subscription={safeSubscription}
           />
         );
 
@@ -88,7 +111,7 @@ const user = data.user; // ✅ artık TS için kesin non-null
     <SettingsLayout>
       <div className="space-y-8">
         <SettingsTabs isPremium={isPremium} />
-        <div>{renderTabContent()}</div>
+        {renderTabContent()}
       </div>
     </SettingsLayout>
   );

@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic"; // her zaman güncel veri
+export const dynamic = "force-dynamic";
 
 import { supabaseServiceRoleClient } from "@/lib/supabase/server";
 import { getAdminContext } from "@/lib/admin/context";
@@ -13,14 +13,12 @@ interface PageProps {
   params: { id: string };
 }
 
-
-
 export default async function SubmissionDetailPage({
   params,
 }: PageProps) {
   const submissionId = params.id;
 
-  const { org, member } = await getAdminContext();
+  const { org, member, access } = await getAdminContext();
   const db = supabaseServiceRoleClient();
 
   /* ---------- SUBMISSION ---------- */
@@ -33,11 +31,9 @@ export default async function SubmissionDetailPage({
 
   if (error || !data) {
     return (
-      
-        <div className="p-12 text-center text-red-500">
-          Kayıt bulunamadı veya erişim izni yok.
-        </div>
-      
+      <div className="p-12 text-center text-red-500">
+        Kayıt bulunamadı veya erişim izni yok.
+      </div>
     );
   }
 
@@ -48,7 +44,7 @@ export default async function SubmissionDetailPage({
     .eq("submission_id", submissionId)
     .eq("organization_id", org.id);
 
-  /* ---------- FINDINGS (NEW SOURCE) ---------- */
+  /* ---------- FINDINGS ---------- */
   const { data: findings } = await db
     .from("submission_findings")
     .select(`
@@ -75,14 +71,13 @@ export default async function SubmissionDetailPage({
   );
 
   return (
-    
-      <ClientSideView
-        submission={submission}
-        grouped={grouped}
-        isPremium={org.is_premium === true}
-        role={member.role_name}
-        submissionId={submissionId}
-      />
+    <ClientSideView
+      submission={submission}
+      grouped={grouped}
+      isPremium={access.premium} 
+      role={member.role}           
+      submissionId={submissionId}
+    />
   );
 }
 

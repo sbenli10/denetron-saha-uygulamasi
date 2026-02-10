@@ -1,3 +1,4 @@
+//APP\app\api\register\route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -150,6 +151,31 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+
+    /* -------------------------------------------------
+    3.5) ORG SUBSCRIPTION CREATE (DEFAULT: FREE)
+  ------------------------------------------------- */
+  const { error: subError } = await supabaseAdmin
+    .from("org_subscriptions")
+    .insert({
+      org_id: org.id,
+      plan: "free",
+      status: "active",
+      trial_used: false,
+      started_at: new Date().toISOString(),
+      expires_at: null,
+    });
+
+  if (subError) {
+    return NextResponse.json(
+      {
+        error: "Abonelik kaydı oluşturulamadı.",
+        hint: "Lütfen destek ekibiyle iletişime geçin.",
+      },
+      { status: 500 }
+    );
+  }
+
 
     /* -------------------------------------------------
        4) PROFILE UPSERT (ADMIN)
