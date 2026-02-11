@@ -319,3 +319,44 @@ html[data-theme="dark"] .border-gray-300 {
   --premium-border: rgba(252, 211, 77, 0.35);
   --premium-glow: rgba(252, 211, 77, 0.45);
 }
+
+
+/* ===== Operator UI Tokens ===== */
+:root {
+  /* spacing */
+  --op-radius-xl: 18px;
+  --op-radius-2xl: 22px;
+  --op-radius-3xl: 28px;
+
+  --op-touch: 56px; /* minimum touch target */
+  --op-gap: 12px;
+
+  /* colors (dark, field-friendly) */
+  --op-bg: #070b14;
+  --op-surface-1: rgba(255, 255, 255, 0.06);
+  --op-surface-2: rgba(255, 255, 255, 0.08);
+  --op-surface-3: rgba(255, 255, 255, 0.10);
+
+  --op-border: rgba(255, 255, 255, 0.10);
+  --op-border-strong: rgba(255, 255, 255, 0.16);
+
+  --op-text: rgba(255, 255, 255, 0.92);
+  --op-muted: rgba(255, 255, 255, 0.60);
+  --op-subtle: rgba(255, 255, 255, 0.40);
+
+  --op-primary: #2563eb; /* Electric blue */
+  --op-primary-2: #60a5fa;
+
+  --op-danger: #dc2626;
+  --op-warning: #f59e0b;
+  --op-success: #16a34a;
+
+  --op-ring: rgba(96, 165, 250, 0.50);
+
+  /* shadows */
+  --op-shadow-1: 0 10px 30px rgba(0,0,0,0.45);
+  --op-shadow-2: 0 16px 50px rgba(0,0,0,0.55);
+}
+
+/* optional: nicer text rendering */
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }

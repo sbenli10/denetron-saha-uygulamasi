@@ -1,44 +1,55 @@
+// APP/app/operator/ai-analiz/components/MediaSelector.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ImageIcon } from "lucide-react";
 import { AIMediaItem } from "../types";
+import { cn } from "@/app/components/ui/cn";
 
-export default function MediaSelector({
-  onChange,
-}: {
-  onChange: (items: AIMediaItem[]) => void;
-}) {
-  const [media, setMedia] = useState<AIMediaItem[]>([]);
+export default function MediaSelector({ onChange }: { onChange: (items: AIMediaItem[]) => void }) {
+  const [media] = useState<AIMediaItem[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
 
   useEffect(() => {
-    onChange(media.filter(m => selected.includes(m.url)));
+    onChange(media.filter((m) => selected.includes(m.url)));
   }, [selected, media, onChange]);
 
   function toggle(url: string) {
-    setSelected(prev =>
-      prev.includes(url)
-        ? prev.filter(x => x !== url)
-        : [...prev, url]
+    setSelected((prev) => (prev.includes(url) ? prev.filter((x) => x !== url) : [...prev, url]));
+  }
+
+  const selectedCount = selected.length;
+
+  const empty = useMemo(() => media.length === 0, [media.length]);
+
+  if (empty) {
+    return (
+      <div className="rounded-[var(--op-radius-2xl)] border border-[color:var(--op-border)] bg-white/5 p-6 text-center">
+        <div className="mx-auto h-12 w-12 rounded-2xl border border-[color:var(--op-border)] bg-black/15 flex items-center justify-center">
+          <ImageIcon className="h-6 w-6 text-[color:var(--op-muted)]" />
+        </div>
+        <div className="mt-3 text-[13px] font-semibold text-[color:var(--op-text)]">Henüz medya yok</div>
+        <div className="mt-1 text-[12px] text-[color:var(--op-muted)]">
+          Bu bölüm v2 görüntü analizi için hazır. Medya eklendiğinde burada görünecek.
+        </div>
+      </div>
     );
   }
 
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-slate-300">
-          Analize Dahil Edilecek Medyalar
-        </h2>
+        <div className="text-[12px] text-[color:var(--op-muted)]">
+          Seçim yaparak analiz kapsamını belirleyin.
+        </div>
 
-        {selected.length > 0 && (
-          <span className="text-xs text-yellow-400">
-            {selected.length} seçildi
-          </span>
-        )}
+        {selectedCount > 0 ? (
+          <div className="text-[12px] font-semibold text-[color:var(--op-warning)]">{selectedCount} seçildi</div>
+        ) : null}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        {media.map(m => {
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {media.map((m) => {
           const isSelected = selected.includes(m.url);
 
           return (
@@ -47,28 +58,16 @@ export default function MediaSelector({
               type="button"
               onClick={() => toggle(m.url)}
               aria-pressed={isSelected}
-              className={`
-                relative group rounded-xl overflow-hidden border
-                transition
-                focus:outline-none focus:ring-2 focus:ring-yellow-500/50
-                ${isSelected
-                  ? "border-yellow-500 ring-2 ring-yellow-500/40"
-                  : "border-white/10 hover:border-white/30"}
-              `}
-            >
-              <img
-                src={m.url}
-                alt="Analiz medyası"
-                className="
-                  h-28 w-full object-cover
-                  transition-transform duration-200
-                  group-hover:scale-[1.02]
-                "
-              />
-
-              {isSelected && (
-                <div className="absolute inset-0 bg-yellow-500/10" />
+              className={cn(
+                "relative overflow-hidden rounded-[18px] border transition active:scale-[0.99]",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--op-ring)]",
+                isSelected
+                  ? "border-[color:color-mix(in_oklab,var(--op-warning)_55%,transparent)] bg-[color:color-mix(in_oklab,var(--op-warning)_10%,transparent)]"
+                  : "border-[color:var(--op-border)] bg-[color:var(--op-surface-1)] hover:bg-white/5"
               )}
+            >
+              <img src={m.url} alt="Analiz medyası" className="h-28 w-full object-cover" />
+              {isSelected ? <div className="absolute inset-0 bg-[color:color-mix(in_oklab,var(--op-warning)_12%,transparent)]" /> : null}
             </button>
           );
         })}

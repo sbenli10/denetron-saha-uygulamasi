@@ -126,6 +126,8 @@ export async function GET(req: Request) {
       isg_uzmani,
       bildirim_sekli,
       analysis,
+      ai_report,
+      ai_updated_at,
       items:dof_items (
         area,
         deadline,
@@ -138,7 +140,6 @@ export async function GET(req: Request) {
         )
       )
     `)
-
     .eq("id", dofId)
     .single<{
       report_no: string;
@@ -148,8 +149,12 @@ export async function GET(req: Request) {
       isg_uzmani: string;
       bildirim_sekli: string;
       analysis: string | null;
+      ai_report: string | null;
+      ai_updated_at: string | null;
       items: DofItem[];
     }>();
+
+
 
 
     console.log("[WORD_EXPORT] RAW DOF DATA");
@@ -196,8 +201,8 @@ children.push(
     rows: [
       ["Firma Adı", organization?.name],
       ["Konu", dof.konu],
-      ["Rapor No", dof.sayi],
       ["Tarih", safe(dof.report_date)],
+      ["SAYI", dof.sayi],
       ["İSG Uzmanı", dof.isg_uzmani],
       ["Bildirim Şekli", dof.bildirim_sekli],
     ].map(([label, value]) =>
@@ -307,10 +312,10 @@ for (const item of dof.items ?? []) {
           tableHeader: true,
           children: [
             ["AÇIKLAMA", COL_WIDTHS.description],
-            ["RESİMLER", COL_WIDTHS.images],
+            ["RESİM", COL_WIDTHS.images],
             ["ÖNEM", COL_WIDTHS.severity],
             ["TERMİN", COL_WIDTHS.deadline],
-            ["SORUMLU BÖLÜM", COL_WIDTHS.area],
+            ["İLGİLİ BÖLÜM", COL_WIDTHS.area],
           ].map(([text, width]) =>
             new TableCell({
               width: { size: width as number, type: WidthType.DXA },
@@ -405,6 +410,65 @@ if (dof.analysis) {
   );
 }
 
+
+  /* ================= AI REPORT ================= */
+  if (dof.ai_report && dof.ai_report.trim().length > 0) {
+    children.push(new Paragraph({ pageBreakBefore: true }));
+
+    children.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 200 },
+        children: [
+          new TextRun({
+            text: "YAPAY ZEKÂ ANALİZ RAPORU",
+            bold: true,
+            size: 22,
+          }),
+        ],
+      })
+    );
+
+    // (opsiyonel) tarih göstermek istersen:
+    if (dof.ai_updated_at) {
+      children.push(
+        new Paragraph({
+          alignment: AlignmentType.RIGHT,
+          spacing: { after: 120 },
+          children: [
+            new TextRun({
+              text: `Güncelleme: ${new Date(dof.ai_updated_at).toLocaleString("tr-TR")}`,
+              size: 18,
+              color: "666666",
+            }),
+          ],
+        })
+      );
+    }
+
+    children.push(
+      new Table({
+        width: { size: PAGE_WIDTH_DXA, type: WidthType.DXA },
+        layout: "fixed",
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                children: [
+                  new Paragraph({
+                    spacing: { line: 360 },
+                    children: [new TextRun(safe(dof.ai_report))],
+                  }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      })
+    );
+  }
+
+
 /* ================= EXPORT ================= */
 
 const doc = new Document({
@@ -434,7 +498,6 @@ return new NextResponse(new Uint8Array(buffer), {
     "Content-Disposition": `attachment; filename="${dof.report_no}.docx"`,
   },
 });
-
 }
 
 

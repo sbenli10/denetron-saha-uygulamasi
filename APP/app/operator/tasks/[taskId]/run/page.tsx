@@ -1,6 +1,5 @@
 // APP/app/operator/tasks/[taskId]/run/page.tsx
 
-import OperatorShell from "@/components/operator/OperatorShell";
 import TaskRunClient from "@/components/operator/TaskRunClient";
 import { getOperatorContext } from "@/lib/operator/context";
 import { supabaseServiceRoleClient } from "@/lib/supabase/server";
@@ -59,13 +58,12 @@ export default async function TaskRunPage({ params }: TaskRunPageProps) {
   };
 
   return (
-    <OperatorShell user={user} org={org}>
+    
       <TaskRunClient
         taskId={assigned.id}
         user={user}
         org={org}
         questions={questions}
       />
-    </OperatorShell>
   );
 }

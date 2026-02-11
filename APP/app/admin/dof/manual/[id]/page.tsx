@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import useSWR from "swr";
 import { useParams } from "next/navigation";
-import { useState,useRef } from "react";
+import { useState,useRef,useEffect } from "react";
 import ManualAddItemModal from "@/app/components/dof/manual/ManualAddItemModal";
 import DofItemEvidenceModal from "@/app/components/dof/manual/DofItemEvidenceModal";
 
@@ -48,6 +48,8 @@ export default function ManualDofDetailPage() {
   const [manualAnalysisStatus, setManualAnalysisStatus] = useState<
   "idle" | "saving" | "success" | "error"
   >("idle");
+    // üstte state'lere ekle:
+  const [isAiSaved, setIsAiSaved] = useState(false);
 
   const [analysisText, setAnalysisText] = useState<string>("");
   const [savingAnalysis, setSavingAnalysis] = useState(false);
@@ -70,6 +72,16 @@ export default function ManualDofDetailPage() {
     dofId ? `/api/dof/manual/detail?id=${dofId}` : null,
     fetcher
   );
+  
+  useEffect(() => {
+    // ai_report kolonunu ekledin: dof_reports.ai_report
+    const saved = Boolean((data as any)?.dof?.ai_report);
+    setIsAiSaved(saved);
+
+    // Kaydedilmişse UI state’i de tutarlı kalsın
+    if (saved) setSaveAiStatus("success");
+  }, [data]);
+
   const [showAddItem, setShowAddItem] = useState(false);
   const [editItem, setEditItem] = useState<DofItem | null>(null);
   const [evidenceFor, setEvidenceFor] = useState<string | null>(null);
@@ -80,7 +92,13 @@ export default function ManualDofDetailPage() {
   >("idle");
   const [isEditingAnalysis, setIsEditingAnalysis] = useState(true);
 
-  
+  const savedReport = (data?.dof as any)?.ai_report ?? ""; // type’ına eklemen daha iyi
+  const hasDraft = Boolean(aiResult?.trim());
+  const isDraftSaved = hasDraft && aiResult.trim() === savedReport.trim();
+
+  const saveDisabled =
+    !hasDraft || saveAiStatus === "saving" || isDraftSaved;
+  const draftReport = (aiResult ?? "").trim();
 
   if (isLoading) {
     return <div className="p-10 text-sm text-gray-500">Yükleniyor…</div>;
@@ -97,7 +115,6 @@ export default function ManualDofDetailPage() {
     i => i.status === "completed"
   );
 
-  
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-6 py-8">
@@ -491,64 +508,95 @@ export default function ManualDofDetailPage() {
                 disabled={completedItems.length === 0 || aiStatus === "loading"}
                 onClick={async () => {
                   setAiStatus("loading");
+
                   try {
                     const res = await fetch("/api/dof/manual/ai-analysis", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ dof_id: dof.id }),
+                      body: JSON.stringify({
+                        dof_id: dof.id,
+                        mode: "draft",
+                        robust: false,
+                        item_statuses: ["open", "overdue", "completed"],
+                      }),
                     });
 
-                    if (!res.ok) throw new Error();
-
                     const json = await res.json();
-                    setAiResult(json.analysis);
+                    if (!res.ok) throw new Error(json?.error || "ai_failed");
+
+                    // ✅ yeni draft geldi → kaydet butonu tekrar aktif olmalı
+                    setAiResult(json.analysis ?? "");
+                    setIsAiSaved(false);
+                    setSaveAiStatus("idle");
+
                     setAiStatus("success");
-                  } catch {
+                  } catch (e) {
+                    console.error("[AI] generate failed", e);
                     setAiStatus("error");
                   }
                 }}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:bg-gray-300"
               >
-                {aiStatus === "loading"
-                  ? "Analiz Ediliyor…"
-                  : "AI Analizi Oluştur"}
+                {aiStatus === "loading" ? "Analiz Ediliyor…" : "AI Analizi Oluştur"}
               </button>
 
-              {/* ANALİZİ KAYDET */}
+
               <button
-                disabled={!aiResult || saveAiStatus === "saving"}
+                type="button"
+                disabled={saveDisabled}
+                aria-disabled={saveDisabled}
                 onClick={async () => {
+                  if (saveDisabled) return;
+
                   setSaveAiStatus("saving");
                   try {
-                    const res = await fetch(
-                      "/api/dof/manual/save-ai-analysis",
-                      {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          dof_id: dof.id,
-                          analysis: aiResult,
-                        }),
-                      }
-                    );
+                    const res = await fetch("/api/dof/manual/save-ai-analysis", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        dof_id: dof.id,
+                        analysis: aiResult,
+                      }),
+                    });
 
                     if (!res.ok) throw new Error();
 
-                    await mutate(); // SWR refresh
+                    await mutate(); // ✅ DB'deki ai_report güncellenir -> isAiSaved true olur
                     setSaveAiStatus("success");
-                    setTimeout(() => setSaveAiStatus("idle"), 2000);
+                    window.setTimeout(() => setSaveAiStatus("idle"), 1200);
                   } catch {
                     setSaveAiStatus("error");
-                    setTimeout(() => setSaveAiStatus("idle"), 3000);
+                    window.setTimeout(() => setSaveAiStatus("idle"), 2500);
                   }
                 }}
-                className="rounded-lg border px-4 py-2 text-sm"
+                className={[
+                  "rounded-lg px-4 py-2 text-sm font-semibold transition border",
+                  "focus:outline-none focus:ring-2 focus:ring-offset-2",
+                  isAiSaved
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 cursor-not-allowed"
+                    : saveAiStatus === "saving"
+                    ? "bg-blue-600/80 text-white border-blue-600 cursor-not-allowed"
+                    : saveAiStatus === "error"
+                    ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                    : !draftReport
+                    ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                    : "bg-white text-gray-800 border-gray-200 hover:bg-gray-50",
+                  isAiSaved
+                    ? "focus:ring-emerald-300"
+                    : saveAiStatus === "error"
+                    ? "focus:ring-red-300"
+                    : "focus:ring-blue-300",
+                ].join(" ")}
               >
-                {saveAiStatus === "idle" && "AI Analizini Kaydet"}
-                {saveAiStatus === "saving" && "Kaydediliyor…"}
-                {saveAiStatus === "success" && "Kaydedildi ✓"}
-                {saveAiStatus === "error" && "Hata Oluştu"}
+                {isAiSaved
+                  ? "Kaydedildi ✓"
+                  : saveAiStatus === "saving"
+                  ? "Kaydediliyor…"
+                  : saveAiStatus === "error"
+                  ? "Hata Oluştu"
+                  : "AI Analizini Kaydet"}
               </button>
+
             </div>
           )}
         </div>

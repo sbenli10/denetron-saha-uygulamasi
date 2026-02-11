@@ -17,7 +17,8 @@ export async function POST(req: Request) {
   console.log(`🔐 [LOGIN] reqId=${reqId}`);
 
   try {
-    const { email, password, rememberMe } = await req.json();
+       const body = await req.json();
+      const { email, password, rememberMe, orgId, operatorOnly } = body ?? {};
 
     if (!email || !password) {
       console.log("❌ missing email/password");
@@ -114,25 +115,50 @@ export async function POST(req: Request) {
 
     console.log("✅ Auth OK userId=", user.id);
 
-    // 2) Org/role + policy
+   // 3️⃣ membership + aktif org seçimi
     const admin = supabaseServiceRoleClient();
 
-    const { data: member } = await admin
+    let q = admin
       .from("org_members")
-      .select("org_id, role")
+      .select("org_id, role, created_at, deleted_at")
       .eq("user_id", user.id)
       .is("deleted_at", null)
-      .maybeSingle();
+      .order("created_at", { ascending: false });
 
-    if (!member) return NextResponse.json({ error: "Organizasyon bulunamadı" }, { status: 403 });
+    // UI’de operator girişi ise admin’i dışla (senin getOperatorContext ile uyumlu)
+    if (operatorOnly) {
+      q = q.neq("role", "admin");
+    }
+
+    const { data: members, error: memErr } = await q;
+
+    if (memErr) {
+      console.error("❌ ORG MEMBERS QUERY ERROR", { message: memErr.message });
+      return NextResponse.json({ error: "Organizasyon bulunamadı" }, { status: 403 });
+    }
+
+    if (!members || members.length === 0) {
+      return NextResponse.json({ error: "Organizasyon bulunamadı" }, { status: 403 });
+    }
+
+    // (A) orgId seçili geldiyse onu kullan
+    let member =
+      orgId ? members.find((m) => m.org_id === orgId) : undefined;
+
+    // (B) yoksa operatorOnly ise zaten admin filtresi var; en yenisini al
+    if (!member) member = members[0];
+
+    if (!member) {
+      return NextResponse.json({ error: "Organizasyon bulunamadı" }, { status: 403 });
+    }
 
     const { data: orgSettings } = await admin
       .from("org_settings")
-      .select("org_id, mfa_required")
+      .select("org_id, force_2fa")
       .eq("org_id", member.org_id)
       .maybeSingle();
 
-    const mfaRequiredByOrg = orgSettings?.mfa_required === true;
+    const mfaRequiredByOrg = orgSettings?.force_2fa === true;
 
     /**
      * 3️⃣ DEVICE CONTEXT
@@ -157,25 +183,26 @@ export async function POST(req: Request) {
      * 4️⃣ DEVICE UPSERT + SESSION LOGS
      * (hash varsa cihaz tanınır, yoksa ilk login kabul edilir)
      */
-    if (deviceHash) {
-      await admin
-        await admin.from("devices").upsert(
-        {
-          user_id: user.id,
-          org_id: member.org_id,
-          device_hash: deviceHash,
-          label: parsed.label,   // 🔥 BUNU YAZ
-          platform: parsed.os,
-          last_seen_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id,org_id,device_hash" }
-      );
-    }
+   if (deviceHash) {
+    await admin.from("devices").upsert(
+      {
+        user_id: user.id,
+        org_id: member.org_id,
+        device_hash: deviceHash,
+        label: parsed.label,
+        platform: parsed.os,
+        last_seen_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,org_id,device_hash" }
+    );
+  }
 
     await admin
       .from("device_sessions")
       .update({ is_current: false })
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .eq("org_id", member.org_id);
+
 
     await admin.from("device_sessions").insert({
       user_id: user.id,
@@ -220,7 +247,18 @@ export async function POST(req: Request) {
 
 
   // 7️⃣ MFA KARARI (NET VE TEK)
+  const mustSetupMfa = mfaRequiredByOrg && !hasUserMfa;
   const shouldAskMfa = hasUserMfa && !isTrusted;
+  
+  if (mustSetupMfa) {
+    return NextResponse.json({
+      ok: true,
+      mfaSetupRequired: true,
+      role: member.role,
+      orgId: member.org_id
+    });
+  }
+
 
   console.log("🧠 MFA DECISION", {
     userId: user.id,

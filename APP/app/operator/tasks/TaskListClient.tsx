@@ -1,30 +1,31 @@
-//APP\app\operator\tasks\TaskListClient.tsx
+// APP/app/operator/tasks/TaskListClient.tsx
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { AlertTriangle, CheckCircle2, Play, CalendarClock } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { TaskFilterTabs, TaskFilter } from "./TaskFilterTabs";
 
-interface TaskRow {
+import { Badge, Button, Card } from "@/app/components/ui/ui";
+
+/* ================= TYPES ================= */
+
+export interface TaskRow {
   id: string;
   status: "pending" | "in_progress" | "completed" | "overdue";
   due_date: string | null;
   template_name: string | null;
 }
 
+/* ================= HELPERS ================= */
 
 function getEffectiveStatus(t: TaskRow): TaskRow["status"] {
-  if (
-    t.due_date &&
-    new Date(t.due_date).getTime() < Date.now() &&
-    t.status !== "completed"
-  ) {
+  if (t.due_date && new Date(t.due_date).getTime() < Date.now() && t.status !== "completed") {
     return "overdue";
   }
   return t.status;
 }
-
-
 
 function fmtDate(date?: string | null) {
   return date
@@ -37,98 +38,119 @@ function fmtDate(date?: string | null) {
     : "Tarih yok";
 }
 
-  export function TaskListClient({ rows }: { rows: TaskRow[] }) {
-    const [filter, setFilter] = useState<TaskFilter>("all");
+type StatusMeta = {
+  label: string;
+  tone: "neutral" | "success" | "warning" | "danger";
+  icon: LucideIcon;
+};
 
-    const filteredRows = rows.filter(t => {
+function statusMeta(status: TaskRow["status"]): StatusMeta {
+  switch (status) {
+    case "completed":
+      return { label: "Tamamlandı", tone: "success", icon: CheckCircle2 };
+    case "overdue":
+      return { label: "Süresi Doldu", tone: "danger", icon: AlertTriangle };
+    case "in_progress":
+      return { label: "Devam", tone: "warning", icon: Play };
+    case "pending":
+    default:
+      return { label: "Açık", tone: "neutral", icon: CalendarClock };
+  }
+}
+
+/* ================= COMPONENT ================= */
+
+export function TaskListClient({ rows }: { rows: TaskRow[] }) {
+  const [filter, setFilter] = useState<TaskFilter>("all");
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((t) => {
       const status = getEffectiveStatus(t);
 
       if (filter === "all") return true;
-      if (filter === "open")
-        return status === "pending" || status === "in_progress";
+      if (filter === "open") return status === "pending" || status === "in_progress";
       if (filter === "completed") return status === "completed";
       if (filter === "overdue") return status === "overdue";
       return true;
     });
+  }, [rows, filter]);
 
-
-    return (
+  return (
     <div className="space-y-3">
       <TaskFilterTabs value={filter} onChange={setFilter} />
 
       {filteredRows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/15 p-5 text-center text-sm text-neutral-400">
-          Bu filtreye ait görev yok.
+        <div className="rounded-[var(--op-radius-2xl)] border border-[color:var(--op-border)] bg-[color:var(--op-surface-1)] p-6 text-center">
+          <div className="text-[13px] font-semibold text-[color:var(--op-text)]">Kayıt bulunamadı</div>
+          <div className="mt-1 text-[12px] text-[color:var(--op-muted)]">Bu filtreye ait görev yok.</div>
         </div>
       ) : (
-        filteredRows.map(t => {
-          const status = getEffectiveStatus(t);
+        filteredRows.map((t) => {
+          const effective = getEffectiveStatus(t);
+          const meta = statusMeta(effective);
+          const MetaIcon = meta.icon;
+
+          const isDone = effective === "completed";
+          const isOverdue = effective === "overdue";
 
           return (
-            <div
+            <Card
               key={t.id}
-              className="rounded-2xl border border-white/10 bg-black/80 p-4"
+              className={[
+                "overflow-hidden",
+                isOverdue
+                  ? "border-[color:color-mix(in_oklab,var(--op-danger)_45%,transparent)] bg-[color:color-mix(in_oklab,var(--op-danger)_10%,transparent)]"
+                  : "border-[color:var(--op-border)]",
+              ].join(" ")}
             >
-              <div className="space-y-3">
-                {/* BAŞLIK */}
-                <div>
-                  <div className="text-sm font-semibold text-neutral-50">
-                    {t.template_name ?? "Tanımsız Görev"}
+              <div className="px-4 pt-4 pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[14px] font-extrabold text-[color:var(--op-text)] truncate">
+                      {t.template_name ?? "Tanımsız Görev"}
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 text-[12px] text-[color:var(--op-muted)]">
+                      <CalendarClock className="h-4 w-4" />
+                      <span className="truncate">Son Tarih: {fmtDate(t.due_date)}</span>
+                    </div>
                   </div>
 
-                  <div className="mt-1 text-xs text-neutral-400">
-                    Son Tarih: {fmtDate(t.due_date)}
-                  </div>
+                  <Badge tone={meta.tone} className="shrink-0">
+                    <MetaIcon className="h-3.5 w-3.5" />
+                    {meta.label}
+                  </Badge>
                 </div>
-
-                {/* AKSİYON */}
-                {status === "completed" ? (
-                  <div className="
-                    flex items-center justify-center gap-2
-                    h-11 w-full
-                    rounded-xl
-                    border border-emerald-400/30
-                    bg-emerald-400/10
-                    text-[13px] font-semibold text-emerald-300
-                  ">
-                    ✓ Tamamlandı
-                  </div>
-                ) : status === "overdue" ? (
-                  <div className="
-                    flex items-center justify-center gap-2
-                    h-11 w-full
-                    rounded-xl
-                    bg-danger
-                    text-[13px] font-semibold text-white
-                    shadow-lg shadow-danger/40
-                  ">
-                    ⏰ Süresi Doldu
-                  </div>
-                ) : (
-                  <Link
-                      href={`/operator/tasks/${t.id}/run`}
-                      className="
-                        flex items-center justify-center gap-2
-                        h-11 w-full
-                        rounded-xl
-                        bg-primary
-                        text-[13px] font-semibold text-white
-                        shadow-lg shadow-primary/40
-                        active:scale-[0.98]
-                        transition
-                      "
-                    >
-                      ▶ Formu Aç
-                    </Link>
-
-                )}
-
               </div>
-            </div>
+
+              <div className="px-4 pb-4">
+                {isDone ? (
+                  <div className="h-[var(--op-touch)] w-full rounded-[var(--op-radius-2xl)] border border-[color:color-mix(in_oklab,var(--op-success)_35%,transparent)] bg-[color:color-mix(in_oklab,var(--op-success)_14%,transparent)] text-[color:var(--op-text)] flex items-center justify-center gap-2 font-extrabold">
+                    <CheckCircle2 className="h-5 w-5" />
+                    Tamamlandı
+                  </div>
+                ) : isOverdue ? (
+                  <Link href={`/operator/tasks/${t.id}/run`} className="block" aria-label="Gecikmiş görevi aç">
+                    <div className="h-[var(--op-touch)] w-full rounded-[var(--op-radius-2xl)] bg-[color:var(--op-danger)] text-white shadow-[var(--op-shadow-1)] flex items-center justify-center gap-2 font-extrabold active:scale-[0.99] transition">
+                      <AlertTriangle className="h-5 w-5" />
+                      Süresi Doldu — Aç
+                    </div>
+                  </Link>
+                ) : (
+                  <Button
+                    href={`/operator/tasks/${t.id}/run`}
+                    tone="primary"
+                    size="lg"
+                    leftIcon={Play}
+                    className="w-full"
+                  >
+                    Formu Aç
+                  </Button>
+                )}
+              </div>
+            </Card>
           );
         })
       )}
     </div>
   );
-
 }

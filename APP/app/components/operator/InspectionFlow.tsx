@@ -432,146 +432,143 @@ function attemptCloseFinding() {
       ]);
     }
 
-/* ================= FINDING SAVE ================= */
-async function handleSaveFinding() {
-  console.group("💾 [FINDING SAVE] START");
+    /* ================= FINDING SAVE ================= */
+    async function handleSaveFinding() {
+      console.group("💾 [FINDING SAVE] START");
 
-  setError(null);
+      setError(null);
 
-  console.log("🧩 Question", {
-    id: current.id,
-    text: current.text,
-  });
-
-  console.log("📝 Finding text:", findingText);
-
-  console.log(
-    "📸 Media items:",
-    mediaItems.map((m, i) => ({
-      index: i,
-      type: m.type,
-      size: m.blob?.size,
-      mime: m.blob?.type,
-      isBlob: m.blob instanceof Blob,
-    }))
-  );
-
-  if (!findingText.trim()) {
-    console.warn("⚠️ Finding text boş");
-    setError("Açıklama zorunludur.");
-    console.groupEnd();
-    return;
-  }
-
-  const record = {
-    questionId: current.id,
-    questionText: current.text,
-    answer: "no" as const,
-    findingText,
-    media: mediaItems.map(m => ({
-      blob: m.blob,
-      type: m.type,
-    })),
-  };
-
-  console.log("📦 AnswerRecord PUSH EDİLİYOR:", {
-    questionId: record.questionId,
-    answer: record.answer,
-    mediaCount: record.media?.length ?? 0,
-    hasBlob: record.media?.some(m => m.blob instanceof Blob),
-  });
-
-  // 🔥 SADECE STATE'E PUSH (UPLOAD YOK)
-  safePush(record);
-
-  console.log("🧹 UI resetleniyor");
-
-  mediaItems.forEach(m => URL.revokeObjectURL(m.preview));
-  setMediaItems([]);
-  setFindingText("");
-  setShowFinding(false);
-
-  console.groupEnd();
-}
-
-
-    async function handleFinalSubmit() {
-  try {
-    console.group("🚀 FINAL SUBMIT START");
-
-    setUploadState("uploading");
-
-    /* ================= 1️⃣ LOG RAW ANSWERS ================= */
-    console.log("📦 RAW ANSWERS (WITH BLOB)");
-    answers.forEach((a, i) => {
-      console.log(`Q${i}`, {
-        questionId: a.questionId,
-        mediaCount: a.media?.length ?? 0,
-        hasBlob: a.media?.some(m => m.blob instanceof Blob),
+      console.log("🧩 Question", {
+        id: current.id,
+        text: current.text,
       });
-    });
 
-    /* ================= 2️⃣ SUBMISSION OLUŞTUR (BLOB TEMİZ) ================= */
-    const cleanAnswers = answers.map(a => ({
-      questionId: a.questionId,
-      questionText: a.questionText,
-      answer: a.answer,
-      findingText: a.findingText ?? null,
-      media: [], // 🔥 MUTLAKA BOŞ
-    }));
+      console.log("📝 Finding text:", findingText);
 
-    console.log("📤 COMPLETE TASK PAYLOAD (NO BLOB)", cleanAnswers);
-
-    const res = await completeTask({
-      taskId,
-      answers: cleanAnswers as any,
-      description: null,
-    });
-
-    const submissionId = res.submissionId;
-    console.log("🧾 SUBMISSION CREATED", submissionId);
-
-    /* ================= 3️⃣ MEDYA UPLOAD ================= */
-    for (const a of answers) {
-      if (!a.media || a.media.length === 0) continue;
-
-      console.group(`📸 UPLOAD MEDIA FOR ${a.questionId}`);
-
-      for (const m of a.media) {
-        console.log("⬆️ uploading", {
-          questionId: a.questionId,
+      console.log(
+        "📸 Media items:",
+        mediaItems.map((m, i) => ({
+          index: i,
           type: m.type,
-          size: m.blob.size,
-        });
+          size: m.blob?.size,
+          mime: m.blob?.type,
+          isBlob: m.blob instanceof Blob,
+        }))
+      );
 
-        const uploadRes = await uploadMedia({
+      if (!findingText.trim()) {
+        console.warn("⚠️ Finding text boş");
+        setError("Açıklama zorunludur.");
+        console.groupEnd();
+        return;
+      }
+
+      const record = {
+        questionId: current.id,
+        questionText: current.text,
+        answer: "no" as const,
+        findingText,
+        media: mediaItems.map(m => ({
           blob: m.blob,
           type: m.type,
-          orgId,
-          taskId,
-          submissionId,
-          questionId: a.questionId,
-        });
+        })),
+      };
 
-        console.log("✅ upload result", uploadRes);
-      }
+      console.log("📦 AnswerRecord PUSH EDİLİYOR:", {
+        questionId: record.questionId,
+        answer: record.answer,
+        mediaCount: record.media?.length ?? 0,
+        hasBlob: record.media?.some(m => m.blob instanceof Blob),
+      });
+
+      // 🔥 SADECE STATE'E PUSH (UPLOAD YOK)
+      safePush(record);
+
+      console.log("🧹 UI resetleniyor");
+
+      mediaItems.forEach(m => URL.revokeObjectURL(m.preview));
+      setMediaItems([]);
+      setFindingText("");
+      setShowFinding(false);
 
       console.groupEnd();
     }
 
-    console.groupEnd();
 
-    setSubmissionId(submissionId);
-    setCompleted(true);
-    setUploadState("success");
-  } catch (e) {
-    console.error("❌ FINAL SUBMIT FAILED", e);
-    setUploadState("error");
-  }
-}
+        async function handleFinalSubmit() {
+      try {
+        console.group("🚀 FINAL SUBMIT START");
 
+        setUploadState("uploading");
 
+        /* ================= 1️⃣ LOG RAW ANSWERS ================= */
+        console.log("📦 RAW ANSWERS (WITH BLOB)");
+        answers.forEach((a, i) => {
+          console.log(`Q${i}`, {
+            questionId: a.questionId,
+            mediaCount: a.media?.length ?? 0,
+            hasBlob: a.media?.some(m => m.blob instanceof Blob),
+          });
+        });
 
+        /* ================= 2️⃣ SUBMISSION OLUŞTUR (BLOB TEMİZ) ================= */
+        const cleanAnswers = answers.map(a => ({
+          questionId: a.questionId,
+          questionText: a.questionText,
+          answer: a.answer,
+          findingText: a.findingText ?? null,
+          media: [], // 🔥 MUTLAKA BOŞ
+        }));
+
+        console.log("📤 COMPLETE TASK PAYLOAD (NO BLOB)", cleanAnswers);
+
+        const res = await completeTask({
+          taskId,
+          answers: cleanAnswers as any,
+          description: null,
+        });
+
+        const submissionId = res.submissionId;
+        console.log("🧾 SUBMISSION CREATED", submissionId);
+
+        /* ================= 3️⃣ MEDYA UPLOAD ================= */
+        for (const a of answers) {
+          if (!a.media || a.media.length === 0) continue;
+
+          console.group(`📸 UPLOAD MEDIA FOR ${a.questionId}`);
+
+          for (const m of a.media) {
+            console.log("⬆️ uploading", {
+              questionId: a.questionId,
+              type: m.type,
+              size: m.blob.size,
+            });
+
+            const uploadRes = await uploadMedia({
+              blob: m.blob,
+              type: m.type,
+              orgId,
+              taskId,
+              submissionId,
+              questionId: a.questionId,
+            });
+
+            console.log("✅ upload result", uploadRes);
+          }
+
+          console.groupEnd();
+        }
+
+        console.groupEnd();
+
+        setSubmissionId(submissionId);
+        setCompleted(true);
+        setUploadState("success");
+      } catch (e) {
+        console.error("❌ FINAL SUBMIT FAILED", e);
+        setUploadState("error");
+      }
+    }
       async function blobToBase64(blob: Blob): Promise<string> {
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
@@ -632,112 +629,178 @@ async function handleSaveFinding() {
 
 
 
-  /* ================= UI ================= */
+ /* ================= UI ================= */
 return (
-  <div className="flex h-full flex-col">
+  <div className="flex min-h-[100svh] flex-col bg-[color:var(--op-bg)] text-[color:var(--op-text)]">
     {completed ? (
       <CompletionScreen
         submissionId={submissionId}
         onGoHome={() => router.push("/operator/tasks")}
-        onViewDetail={() =>
-          router.push(`/operator/submissions/${submissionId}`)
-        }
+        onViewDetail={() => router.push(`/operator/submissions/${submissionId}`)}
       />
     ) : (
       <>
-        {/* PROGRESS */}
-        <div className="px-5 pt-5">
-          <div className="flex justify-between mb-2 text-xs text-neutral-400">
-            <span>Denetim Adımı {step + 1}</span>
-            <span>
-              %{Math.round(((step + 1) / questions.length) * 100)}
-            </span>
-          </div>
-          <div className="h-2.5 rounded-full bg-neutral-700 overflow-hidden">
-            <div
-              className="h-full bg-primary transition-[width] duration-500 ease-out"
-              style={{
-                width: `${((step + 1) / questions.length) * 100}%`,
-              }}
-            />
+        {/* ================= TOP BAR / PROGRESS ================= */}
+        <div className="sticky top-0 z-30 border-b border-[color:var(--op-border)] bg-[color:color-mix(in_oklab,var(--op-bg)_85%,transparent)] backdrop-blur">
+          <div className="mx-auto max-w-md px-4 pt-4 pb-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-widest text-[color:var(--op-muted)]">
+                  Denetim Akışı
+                </div>
+                <div className="text-[14px] font-extrabold truncate">
+                  Adım {step + 1} / {questions.length}
+                </div>
+              </div>
+
+              <div className="shrink-0 rounded-full border border-[color:var(--op-border)] bg-white/5 px-3 py-1 text-[11px] font-extrabold">
+                %{Math.round(((step + 1) / questions.length) * 100)}
+              </div>
+            </div>
+
+            <div className="mt-3 h-2.5 rounded-full bg-black/25 overflow-hidden border border-[color:var(--op-border)]">
+              <div
+                className="h-full rounded-full bg-[color:var(--op-primary)] transition-[width] duration-500 ease-out"
+                style={{ width: `${((step + 1) / questions.length) * 100}%` }}
+              />
+            </div>
+
+            {/* OPTIONAL: micro hint */}
+            <div className="mt-2 text-[11px] text-[color:var(--op-muted)]">
+              Hızlı seçim: <span className="font-semibold text-[color:var(--op-text)]">Uygun</span> /{" "}
+              <span className="font-semibold text-[color:var(--op-text)]">Uygun Değil</span>
+            </div>
           </div>
         </div>
 
-        {/* QUESTION */}
-        <div className="flex-1 px-5 py-6">
-          <div className="rounded-3xl bg-gradient-to-br from-bg800 to-bg900 p-7 shadow-xl">
-            <p className="text-lg font-medium leading-relaxed text-white">
-              {current.text}
-            </p>
+        {/* ================= QUESTION SURFACE ================= */}
+        <div className="mx-auto w-full max-w-md flex-1 px-4 pt-5 pb-28">
+          {/* Question card */}
+          <div className="rounded-[var(--op-radius-3xl)] border border-[color:var(--op-border)] bg-[color:var(--op-surface-1)] shadow-[var(--op-shadow-2)] overflow-hidden">
+            {/* Header strip */}
+            <div className="px-5 pt-5 pb-4 bg-gradient-to-b from-white/5 to-transparent">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[12px] font-semibold text-[color:var(--op-primary-2)]">
+                    Soru
+                  </div>
+                  <div className="mt-1 text-[16px] font-extrabold leading-snug">
+                    {current.text}
+                  </div>
+                </div>
+
+                {/* Severity badge / optional hook: you can swap with current.severity */}
+                <div className="shrink-0 rounded-full border border-[color:var(--op-border)] bg-black/20 px-3 py-1 text-[11px] font-extrabold">
+                  #{step + 1}
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 pb-5">
+              <div className="rounded-[20px] border border-[color:var(--op-border)] bg-black/15 p-4">
+                <div className="text-[12px] text-[color:var(--op-muted)] leading-relaxed">
+                  Gözlem yapın, ekipman/alanı kontrol edin. Uygunsuzluk varsa açıklama ve medya ekleyin.
+                </div>
+              </div>
+
+              {/* Previous */}
+              {!completed && (
+                <div className="mt-4 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setStep((s) => Math.max(0, s - 1))}
+                    className="text-[12px] font-semibold text-[color:var(--op-muted)] hover:text-[color:var(--op-text)]"
+                  >
+                    ← Önceki soruya dön
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* ACTION BAR */}
+        {/* ================= ACTION BAR ================= */}
         <div
           className="
             sticky bottom-0 z-40
-            bg-bg900/95 backdrop-blur
-            border-t border-bg700
-            px-5 pt-3 pb-safe
+            border-t border-[color:var(--op-border)]
+            bg-[color:color-mix(in_oklab,var(--op-bg)_88%,transparent)]
+            backdrop-blur
           "
         >
-          {!completed && (
-            <div className="flex justify-center mb-3">
-              <button
-                onClick={() => setStep(s => Math.max(0, s - 1))}
-                className="text-xs text-neutral-400"
-              >
-                ← Önceki soruya dön
-              </button>
+          <div className="mx-auto max-w-md px-4 pt-3 pb-safe">
+            {/* Inline status row */}
+            <div className="mb-3 flex items-center justify-between text-[11px] text-[color:var(--op-muted)]">
+              <span>Adım {step + 1} tamamlanıyor</span>
+              <span className="font-semibold text-[color:var(--op-text)]">
+                {allAnswered ? "Gönderime hazır" : "Yanıt bekleniyor"}
+              </span>
             </div>
-          )}
 
-          <div className="flex gap-3">
-            {!allAnswered ? (
-              <>
-                <button
-                  onClick={handleNo}
-                  className="flex-1 h-14 rounded-2xl border border-danger/40
-                            text-danger font-semibold bg-danger/5"
-                >
-                  Uygun Değil
-                </button>
+            <div className="flex gap-3">
+              {!allAnswered ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleNo}
+                    className="
+                      flex-1 h-[var(--op-touch)]
+                      rounded-[var(--op-radius-2xl)]
+                      border border-[color:color-mix(in_oklab,var(--op-danger)_45%,transparent)]
+                      bg-[color:color-mix(in_oklab,var(--op-danger)_10%,transparent)]
+                      text-[color:var(--op-danger)]
+                      font-extrabold
+                      active:scale-[0.99] transition
+                    "
+                  >
+                    Uygun Değil
+                  </button>
 
+                  <button
+                    type="button"
+                    onClick={handleYes}
+                    className="
+                      flex-1 h-[var(--op-touch)]
+                      rounded-[var(--op-radius-2xl)]
+                      bg-[color:var(--op-success)]
+                      text-white
+                      font-extrabold
+                      shadow-[var(--op-shadow-1)]
+                      active:scale-[0.99] transition
+                    "
+                  >
+                    Uygun
+                  </button>
+                </>
+              ) : (
                 <button
-                  onClick={handleYes}
-                  className="flex-1 h-14 rounded-2xl bg-success
-                            text-white font-semibold"
-                >
-                  Uygun
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={handleFinalSubmit}
-                disabled={uploadState !== "idle"}
-                aria-busy={uploadState === "uploading"}
-                className={`
-                  flex-1 h-14 rounded-2xl
-                  font-semibold text-white
-                  transition
-                  ${
+                  type="button"
+                  onClick={handleFinalSubmit}
+                  disabled={uploadState !== "idle"}
+                  aria-busy={uploadState === "uploading"}
+                  className={[
+                    "flex-1 h-[var(--op-touch)] rounded-[var(--op-radius-2xl)] font-extrabold text-white transition",
                     uploadState !== "idle"
-                      ? "bg-primary/60 cursor-not-allowed"
-                      : "bg-primary hover:brightness-110 active:scale-[0.98]"
-                  }
-                `}
-              >
-                {uploadState === "uploading"
-                  ? "Denetim Gönderiliyor…"
-                  : uploadState === "success"
-                  ? "Gönderildi ✓"
-                  : "Denetimi Tamamla"}
-              </button>
-            )}
+                      ? "bg-[color:color-mix(in_oklab,var(--op-primary)_55%,transparent)] cursor-not-allowed"
+                      : "bg-[color:var(--op-primary)] hover:brightness-110 active:scale-[0.99]",
+                  ].join(" ")}
+                >
+                  {uploadState === "uploading"
+                    ? "Denetim Gönderiliyor…"
+                    : uploadState === "success"
+                    ? "Gönderildi ✓"
+                    : "Denetimi Tamamla"}
+                </button>
+              )}
+            </div>
+
+            {/* Safe-area spacer */}
+            <div className="h-2" />
           </div>
         </div>
 
-        {/* FINDING SHEET */}
+        {/* ================= FINDING SHEET ================= */}
         {showFinding && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm">
             <div
@@ -746,135 +809,138 @@ return (
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
               style={{
-                transform: keyboardOffset
-                  ? `translateY(-${keyboardOffset}px)`
-                  : undefined,
+                transform: keyboardOffset ? `translateY(-${keyboardOffset}px)` : undefined,
                 transition: "transform 0.25s ease-out",
               }}
               className="
                 absolute bottom-0 w-full
-                max-h-[85vh]
-                rounded-t-2xl
-                bg-white
-                shadow-2xl
+                max-h-[88vh]
+                rounded-t-[28px]
+                bg-[color:var(--op-surface-1)]
+                border border-[color:var(--op-border)]
+                shadow-[var(--op-shadow-2)]
                 flex flex-col
               "
             >
-              <div className="mx-auto mt-2 mb-2 h-1 w-10 rounded-full bg-neutral-300" />
+              {/* grabber */}
+              <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-white/15" />
 
-              <div className="px-4 pb-2 flex items-start justify-between border-b">
-                <div>
-                  <h3 className="text-sm font-semibold text-neutral-900">
+              {/* header */}
+              <div className="px-4 pt-3 pb-3 flex items-start justify-between gap-3 border-b border-[color:var(--op-border)]">
+                <div className="min-w-0">
+                  <div className="text-[14px] font-extrabold text-[color:var(--op-text)]">
                     Uygunsuzluk Bildirimi
-                  </h3>
-                  <p className="text-[11px] text-neutral-500">
-                    Açıklama ve en az bir fotoğraf veya video zorunludur
-                  </p>
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-[color:var(--op-muted)]">
+                    Açıklama + en az 1 fotoğraf/video zorunludur
+                  </div>
                 </div>
 
                 <button
+                  type="button"
                   onClick={attemptCloseFinding}
-                  className="h-8 w-8 rounded-full bg-neutral-100 flex items-center justify-center"
+                  className="h-11 w-11 rounded-2xl border border-[color:var(--op-border)] bg-white/5 flex items-center justify-center"
+                  aria-label="Kapat"
                 >
-                  <X className="h-4 w-4 text-neutral-600" />
+                  <X className="h-5 w-5 text-[color:var(--op-muted)]" />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-4 pt-3 space-y-3">
-                <div className="relative overflow-visible rounded-xl border border-neutral-300">
+              {/* content */}
+              <div className="flex-1 overflow-y-auto px-4 pt-4 pb-3 space-y-3">
+                {/* textarea */}
+                <div className="rounded-[20px] border border-[color:var(--op-border)] bg-black/15 p-3">
                   <textarea
                     className="
-                      w-full min-h-[90px]
-                      rounded-xl p-3 pr-28 text-sm
-                      text-neutral-900 bg-white
-                      placeholder:text-neutral-400
+                      w-full min-h-[110px]
+                      rounded-[16px] p-3
+                      text-[13px]
+                      text-[color:var(--op-text)]
+                      bg-black/10
+                      placeholder:text-[color:var(--op-muted)]
                       resize-none
                       focus:outline-none
-                      focus:ring-2 focus:ring-primary/30
+                      focus:ring-2 focus:ring-[color:var(--op-ring)]
                     "
-                    placeholder="Uygunsuzluğu kısaca açıklayın…"
+                    placeholder="Uygunsuzluğu net ve kısa açıklayın… (ör: koruyucu kapak eksik, kablo açıkta vb.)"
                     value={findingText}
-                    onChange={e => setFindingText(e.target.value)}
+                    onChange={(e) => setFindingText(e.target.value)}
                   />
-                <button
-                  type="button"
-                  disabled={aiLoading || !hasPhoto}
-                  onClick={handleAIDescription}
-                  className={`
-                    mt-2 w-full h-11 rounded-xl
-                    text-sm font-semibold
-                    transition
-                    ${
-                      aiLoading || !hasPhoto
-                        ? "bg-neutral-300 text-neutral-500 cursor-not-allowed"
-                        : "bg-indigo-600 text-white"
-                    }
-                  `}
-                >
-                  {aiLoading
-                    ? "AI yazıyor…"
-                    : hasPhoto
-                    ? "🧠 AI ile açıklama oluştur"
-                    : "📷 Fotoğraf ekleyin"}
-                </button>
 
-
-                  <div
-                    className="
-                      absolute bottom-2
-                      right-[calc(0.5rem+env(safe-area-inset-right))]
-                      flex items-center gap-1
-                      rounded-full bg-white/95
-                      border border-neutral-300
-                      shadow-md
-                      px-1 py-1
-                      z-10
-                      transition-all duration-200
-                    "
-                  >
+                  {/* tools row */}
+                  <div className="mt-3 flex gap-2">
                     <button
+                      type="button"
                       onClick={startDictation}
                       className="
-                        h-9 w-9 rounded-full
-                        flex items-center justify-center
-                        text-neutral-700
-                        hover:bg-neutral-100
-                        active:scale-95
-                        transition
+                        flex-1 h-11 rounded-[16px]
+                        border border-[color:var(--op-border)]
+                        bg-white/5
+                        text-[12px] font-extrabold
+                        active:scale-[0.99] transition
                       "
                     >
-                      <Mic className="h-4 w-4" />
+                      <span className="inline-flex items-center justify-center gap-2">
+                        <Mic className="h-4 w-4" />
+                        Sesli Not
+                      </span>
                     </button>
 
                     <button
+                      type="button"
                       onClick={() => setShowPhotoPicker(true)}
                       className="
-                        h-9 w-9 shrink-0
-                        rounded-full
-                        flex items-center justify-center
-                        bg-primary text-white
+                        flex-1 h-11 rounded-[16px]
+                        bg-[color:var(--op-primary)]
+                        text-white text-[12px] font-extrabold
+                        shadow-[var(--op-shadow-1)]
+                        active:scale-[0.99] transition
                       "
                     >
-                      <Camera className="h-4 w-4 text-red-500" />
+                      <span className="inline-flex items-center justify-center gap-2">
+                        <Camera className="h-4 w-4" />
+                        Medya Ekle
+                      </span>
                     </button>
                   </div>
+
+                  {/* AI button */}
+                  <button
+                    type="button"
+                    disabled={aiLoading || !hasPhoto}
+                    onClick={handleAIDescription}
+                    className={[
+                      "mt-2 w-full h-11 rounded-[16px] text-[12px] font-extrabold transition",
+                      aiLoading || !hasPhoto
+                        ? "bg-white/10 text-[color:var(--op-muted)] cursor-not-allowed border border-[color:var(--op-border)]"
+                        : "bg-[color:var(--op-primary-2)] text-black shadow-[var(--op-shadow-1)] active:scale-[0.99]",
+                    ].join(" ")}
+                  >
+                    {aiLoading ? "AI yazıyor…" : hasPhoto ? "🧠 AI ile açıklama oluştur" : "📷 Önce fotoğraf ekleyin"}
+                  </button>
                 </div>
-                <div className="space-y-1">
-                  <div className="text-[11px] text-neutral-500">
-                    Medya ({mediaItems.length})
+
+                {/* media grid */}
+                <div className="rounded-[20px] border border-[color:var(--op-border)] bg-[color:var(--op-surface-1)] p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-[11px] text-[color:var(--op-muted)]">Medya ({mediaItems.length})</div>
+                    <button
+                      type="button"
+                      onClick={() => setShowPhotoPicker(true)}
+                      className="text-[11px] font-extrabold text-[color:var(--op-primary-2)]"
+                    >
+                      + Ekle
+                    </button>
                   </div>
 
                   <div className="grid grid-cols-4 gap-2">
                     {mediaItems.map((item, i) => (
                       <div
                         key={i}
-                        className="relative aspect-square rounded-lg overflow-hidden border"
+                        className="relative aspect-square rounded-[14px] overflow-hidden border border-[color:var(--op-border)] bg-black/20"
                       >
                         {item.type === "photo" ? (
-                          <img
-                            src={item.preview}
-                            className="h-full w-full object-cover"
-                          />
+                          <img src={item.preview} className="h-full w-full object-cover" alt="" />
                         ) : (
                           <video
                             src={item.preview}
@@ -886,68 +952,91 @@ return (
                         )}
 
                         <button
+                          type="button"
                           onClick={() => {
                             URL.revokeObjectURL(item.preview);
-                            setMediaItems(prev =>
-                              prev.filter((_, idx) => idx !== i)
-                            );
+                            setMediaItems((prev) => prev.filter((_, idx) => idx !== i));
                           }}
-                          className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/60 flex items-center justify-center"
+                          className="absolute top-1 right-1 h-7 w-7 rounded-full bg-black/60 flex items-center justify-center"
+                          aria-label="Medyayı sil"
                         >
-                          <X className="h-3.5 w-3.5 text-white" />
+                          <X className="h-4 w-4 text-white" />
                         </button>
                       </div>
                     ))}
 
                     <button
+                      type="button"
                       onClick={() => setShowPhotoPicker(true)}
-                      className="aspect-square rounded-lg border border-dashed flex items-center justify-center text-neutral-400"
+                      className="
+                        aspect-square rounded-[14px]
+                        border border-dashed border-[color:var(--op-border)]
+                        bg-white/5
+                        flex items-center justify-center
+                        text-[color:var(--op-muted)]
+                        active:scale-[0.99] transition
+                      "
+                      aria-label="Medya ekle"
                     >
                       <Camera className="h-5 w-5" />
                     </button>
                   </div>
-                </div>
 
-                {error && (
-                  <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 border">
-                    {error}
-                  </div>
-                )}
+                  {error ? (
+                    <div className="mt-3 rounded-[16px] border border-[color:color-mix(in_oklab,var(--op-danger)_35%,transparent)] bg-[color:color-mix(in_oklab,var(--op-danger)_10%,transparent)] px-3 py-2 text-[12px] text-[color:var(--op-danger)]">
+                      {error}
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
-              <div className="border-t px-4 py-3">
+              {/* footer */}
+              <div className="border-t border-[color:var(--op-border)] px-4 py-3 bg-[color:color-mix(in_oklab,var(--op-bg)_60%,transparent)]">
                 <button
+                  type="button"
                   onClick={handleSaveFinding}
                   disabled={uploadState === "uploading"}
-                  className="h-12 w-full rounded-xl bg-blue-600 text-white font-semibold disabled:opacity-60"
+                  className={[
+                    "h-[var(--op-touch)] w-full rounded-[var(--op-radius-2xl)] font-extrabold text-white transition",
+                    uploadState === "uploading"
+                      ? "bg-[color:color-mix(in_oklab,var(--op-primary)_55%,transparent)] cursor-not-allowed"
+                      : "bg-[color:var(--op-primary)] hover:brightness-110 active:scale-[0.99]",
+                  ].join(" ")}
                 >
-                  {uploadState === "uploading"
-                    ? "Yükleniyor…"
-                    : "Kaydet ve Devam Et"}
+                  {uploadState === "uploading" ? "Yükleniyor…" : "Kaydet ve Devam Et"}
                 </button>
               </div>
             </div>
           </div>
         )}
 
+        {/* CAMERA */}
         {cameraOpen && (
-          <CameraView
-            onCapture={handleCapture}
-            onClose={() => setCameraOpen(false)}
-          />
+          <CameraView onCapture={handleCapture} onClose={() => setCameraOpen(false)} />
         )}
 
+        {/* PHOTO PICKER */}
         {showPhotoPicker && (
-          <div className="fixed inset-0 z-[60] bg-black/40 flex items-end">
-            <div className="w-full bg-white rounded-t-2xl p-4 space-y-3">
-              <div className="space-y-2 px-4 pb-4">
+          <div className="fixed inset-0 z-[60] bg-black/50 flex items-end">
+            <div className="w-full rounded-t-[28px] border border-[color:var(--op-border)] bg-[color:var(--op-surface-1)] p-4">
+              <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/15" />
+
+              <div className="space-y-2">
                 <button
                   type="button"
                   onClick={() => {
                     setShowPhotoPicker(false);
                     setCameraOpen(true);
                   }}
-                  className="w-full h-12 rounded-xl bg-blue-600 text-white font-semibold flex items-center justify-center gap-2"
+                  className="
+                    w-full h-[var(--op-touch)]
+                    rounded-[var(--op-radius-2xl)]
+                    bg-[color:var(--op-primary)]
+                    text-white font-extrabold
+                    shadow-[var(--op-shadow-1)]
+                    active:scale-[0.99] transition
+                    flex items-center justify-center gap-2
+                  "
                 >
                   <Camera className="h-5 w-5" />
                   Kamera / Video ile Çek
@@ -957,11 +1046,17 @@ return (
                   type="button"
                   onClick={() => {
                     setShowPhotoPicker(false);
-                    requestAnimationFrame(() => {
-                      fileInputRef.current?.click();
-                    });
+                    requestAnimationFrame(() => fileInputRef.current?.click());
                   }}
-                  className="w-full h-12 rounded-xl bg-neutral-100 text-neutral-900 border border-neutral-300 font-semibold flex items-center justify-center gap-2"
+                  className="
+                    w-full h-[var(--op-touch)]
+                    rounded-[var(--op-radius-2xl)]
+                    border border-[color:var(--op-border)]
+                    bg-white/5
+                    text-[color:var(--op-text)] font-extrabold
+                    active:scale-[0.99] transition
+                    flex items-center justify-center gap-2
+                  "
                 >
                   🖼️ Galeriden Seç
                 </button>
@@ -969,22 +1064,25 @@ return (
                 <button
                   type="button"
                   onClick={() => setShowPhotoPicker(false)}
-                  className="w-full h-10 rounded-xl text-sm text-neutral-600"
+                  className="w-full h-11 rounded-[var(--op-radius-2xl)] text-[12px] text-[color:var(--op-muted)] font-semibold"
                 >
                   İptal
                 </button>
               </div>
+
+              <div className="h-2" />
             </div>
           </div>
         )}
 
+        {/* FILE INPUT */}
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*,video/*"
           multiple
           className="hidden"
-          onChange={async e => {
+          onChange={async (e) => {
             const files = Array.from(e.target.files ?? []);
             for (const file of files) {
               if (file.type.startsWith("image")) {
@@ -996,7 +1094,7 @@ return (
               }
 
               const preview = URL.createObjectURL(file);
-              setMediaItems(prev => [
+              setMediaItems((prev) => [
                 ...prev,
                 {
                   blob: file,
@@ -1013,4 +1111,5 @@ return (
     )}
   </div>
 );
+
 }
