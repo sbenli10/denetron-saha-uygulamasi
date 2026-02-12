@@ -109,7 +109,7 @@ export async function POST(req: Request) {
     if (channel === "email") {
       const inviteUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/invite/${token}`;
 
-      await resend.emails.send({
+      const { data, error: emailError } = await resend.emails.send({
         from: "Denetron <onboarding@resend.dev>",
         to: email,
         subject: "Denetron Organizasyon Daveti",
@@ -119,6 +119,18 @@ export async function POST(req: Request) {
           role: role?.name ?? "Üye",
         }),
       });
+      
+      console.log("RESEND KEY EXISTS:", !!process.env.RESEND_API_KEY);
+
+      if (emailError) {
+        console.error(`[invites][${requestId}] email_error`, emailError);
+
+        return NextResponse.json(
+          { error: "Email gönderilemedi" },
+          { status: 500 }
+        );
+      }
+
     }
 
     console.log(`[invites][${requestId}] success`);

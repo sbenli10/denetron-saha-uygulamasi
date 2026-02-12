@@ -14,7 +14,9 @@ export function middleware(req: NextRequest) {
     "/invite",
     "/reset-password",
     "/auth",
+    "/api/auth",
   ];
+  
 
   if (publicPaths.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();

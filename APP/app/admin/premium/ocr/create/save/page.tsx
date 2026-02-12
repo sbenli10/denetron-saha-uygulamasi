@@ -49,7 +49,7 @@ export default function PremiumOCRSavePage() {
       });
 
       setTimeout(() => {
-        router.push("/admin/premium/ocr/dashboard");
+        router.push("/admin/templates");
       }, 1800);
     } catch {
       setStatus("error");
@@ -206,7 +206,6 @@ export default function PremiumOCRSavePage() {
             </p>
           </div>
         )}
-
       </section>
     </div>
   );

@@ -70,24 +70,7 @@ export function EditRoleModal({
                   />
                 </div>
 
-                <div>
-                  <label className="text-sm font-medium">İzinler</label>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-64 overflow-y-auto p-3 bg-white/40 rounded-xl border">
-                    {PERMISSIONS.map((p) => (
-                      <label key={p} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          name="permissions"
-                          value={p}
-                          defaultChecked={role.permissions.includes(p)}
-                        />
-                        <span>{p}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
+                
                 <div className="flex justify-end gap-3">
                   <button
                     type="button"

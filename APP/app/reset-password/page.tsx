@@ -1,6 +1,7 @@
+//APP\app\reset-password\page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Eye,
@@ -38,6 +39,22 @@ export default function ResetPasswordPage() {
     }
 
     setLoading(true);
+
+    useEffect(() => {
+      const hash = window.location.hash;
+      if (!hash) return;
+    
+      const params = new URLSearchParams(hash.substring(1));
+      const access_token = params.get("access_token");
+      const refresh_token = params.get("refresh_token");
+    
+      if (access_token && refresh_token) {
+        supabase.auth.setSession({
+          access_token,
+          refresh_token,
+        });
+      }
+    }, []);
 
     try {
       // ✅ await ARTIK doğru yerde
@@ -78,6 +95,8 @@ export default function ResetPasswordPage() {
       setLoading(false);
     }
   }
+
+  
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#04060d] text-white px-6">

@@ -47,56 +47,95 @@ export default async function AdminRolesPage() {
           <CreateRoleModal />
         </div>
 
-        {/* Table */}
-        <div className="rounded-3xl bg-white/60 backdrop-blur-2xl p-6 border shadow-xl">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-white/50">
-              <tr>
-                <th className="p-4 text-left">Rol Adı</th>
-                <th className="p-4 text-left">İzinler</th>
-                <th className="p-4 text-left">Oluşturulma</th>
-                <th className="p-4 text-right">İşlemler</th>
-              </tr>
-            </thead>
+       {/* Table */}
+        <div className="rounded-3xl bg-white/60 backdrop-blur-2xl p-4 sm:p-6 border shadow-xl">
+          {/* DESKTOP / TABLET */}
+          <div className="hidden md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm table-fixed">
+                {/* Sabit kolon genişliği: kaymayı engeller */}
+                <colgroup>
+                  <col className="w-auto" />
+                  <col className="w-[160px]" />
+                  <col className="w-[220px]" />
+                </colgroup>
 
-            <tbody>
-              {!roles?.length && (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="text-center p-12 text-black/50 text-lg"
-                  >
-                    Henüz rol tanımlanmamış.
-                  </td>
-                </tr>
-              )}
+                <thead className="border-b bg-white/50">
+                  <tr>
+                    <th className="p-4 text-left">Rol Adı</th>
+                    <th className="p-4 text-left">Oluşturulma</th>
+                    <th className="p-4 text-right">İşlemler</th>
+                  </tr>
+                </thead>
 
-              {roles?.map((role) => (
-                <tr
+                <tbody>
+                  {!roles?.length && (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="text-center p-12 text-black/50 text-lg"
+                      >
+                        Henüz rol tanımlanmamış.
+                      </td>
+                    </tr>
+                  )}
+
+                  {roles?.map((role) => (
+                    <tr key={role.id} className="border-b hover:bg-white/70 transition">
+                      {/* Rol adı: taşarsa kırp */}
+                      <td className="p-4 font-medium truncate">
+                        {role.name}
+                      </td>
+
+                      <td className="p-4">
+                        {new Date(role.created_at).toLocaleDateString("tr-TR")}
+                      </td>
+
+                      {/* İşlemler: asla kırılmasın, sağa yaslı kalsın */}
+                      <td className="p-4">
+                        <div className="flex justify-end gap-2 whitespace-nowrap">
+                          <EditRoleModal role={role} />
+                          <DeleteRoleDialog roleId={role.id} roleName={role.name} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* MOBILE */}
+          <div className="md:hidden space-y-3">
+            {!roles?.length ? (
+              <div className="text-center p-10 text-black/50">
+                Henüz rol tanımlanmamış.
+              </div>
+            ) : (
+              roles.map((role) => (
+                <div
                   key={role.id}
-                  className="border-b hover:bg-white/70 transition"
+                  className="rounded-2xl border bg-white/70 backdrop-blur-xl p-4 shadow-sm"
                 >
-                  <td className="p-4 font-medium">{role.name}</td>
-                  <td className="p-4">
-                    {role.permissions?.length
-                      ? role.permissions.join(", ")
-                      : "-"}
-                  </td>
-                  <td className="p-4">
-                    {new Date(role.created_at).toLocaleDateString("tr-TR")}
-                  </td>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[15px] font-semibold truncate">
+                        {role.name}
+                      </div>
+                      <div className="mt-1 text-[12px] text-black/50">
+                        {new Date(role.created_at).toLocaleDateString("tr-TR")}
+                      </div>
+                    </div>
 
-                  <td className="p-4 flex justify-end gap-2">
-                    <EditRoleModal role={role} />
-                    <DeleteRoleDialog
-                      roleId={role.id}
-                      roleName={role.name}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <div className="shrink-0 flex items-center gap-2">
+                      <EditRoleModal role={role} />
+                      <DeleteRoleDialog roleId={role.id} roleName={role.name} />
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </>

@@ -1,3 +1,4 @@
+//APP\app\api\auth\forgot-password\route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
@@ -33,6 +34,10 @@ function checkRateLimit(key: string, limitMs = 60_000) {
   rateLimitMap.set(key, now);
   return true;
 }
+
+
+console.log(process.env.NEXT_PUBLIC_SITE_URL);
+
 
 /* ================= ROUTE ================= */
 
@@ -99,7 +104,7 @@ export async function POST(req: Request) {
    /* ---------- SEND EMAIL ---------- */
     try {
     await resend.emails.send({
-        from: "Denetron <no-reply@denetron.com>",
+        from: "Denetron <onboarding@resend.dev>",
         to: email,
         subject: "Denetron | Şifre Sıfırlama Talebi",
         html: `

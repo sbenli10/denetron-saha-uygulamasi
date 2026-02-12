@@ -15,11 +15,12 @@ export default function SubmitStatus({ result }: { result: SubmitResult | null }
     <div
       className={`px-4 py-3 rounded-lg text-sm mt-4 border ${
         isSuccess
-          ? "bg-green-700/20 text-green-300 border-green-500/40"
-          : "bg-red-700/20 text-red-300 border-red-500/40"
+        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+        : "bg-red-50 text-red-700 border-red-200"
       }`}
     >
       {result.message}
     </div>
+
   );
 }

@@ -42,8 +42,8 @@ export default function DeleteRoleDialog({
             onClick={() => !isPending && setOpen(false)}
           />
 
-          <div className="fixed inset-0 flex items-center justify-center z-[9999]">
-            <div className="bg-white/70 backdrop-blur-2xl p-6 rounded-3xl border shadow-xl w-full max-w-md">
+         <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-md bg-white/70 backdrop-blur-2xl p-5 sm:p-6 rounded-3xl border shadow-xl">
               <h2 className="text-xl font-semibold mb-3">Rolü Sil</h2>
 
               <p className="text-sm mb-4">
@@ -52,9 +52,9 @@ export default function DeleteRoleDialog({
 
               {errorMsg && <p className="text-sm text-red-600 mb-3">{errorMsg}</p>}
 
-              <div className="flex justify-end gap-3">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
                 <button
-                  className="px-4 py-2 bg-gray-200 rounded-xl"
+                  className="w-full sm:w-auto px-4 py-2 bg-gray-200 rounded-xl"
                   disabled={isPending}
                   onClick={() => setOpen(false)}
                 >
@@ -62,10 +62,8 @@ export default function DeleteRoleDialog({
                 </button>
 
                 <button
-                  className="px-4 py-2 bg-red-600 text-white rounded-xl"
-                  disabled={isPending}
-                  onClick={submit}
-                >
+                  onClick={() => setOpen(true)}
+                  className="w-full sm:w-auto px-4 py-2 bg-gray-200 rounded-xl"                >
                   Sil
                 </button>
               </div>
