@@ -11,7 +11,7 @@ import {
   CheckCircle,
   AlertTriangle,
 } from "lucide-react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { supabase } from "@/lib/supabaseClient";
 
 type Strength = { score: 0 | 1 | 2 | 3; label: string };
 
@@ -32,7 +32,6 @@ function validatePassword(pw: string) {
 }
 
 export default function ResetPasswordPage() {
-  const supabase = createClientComponentClient();
   const router = useRouter();
 
   const [password, setPassword] = useState("");
