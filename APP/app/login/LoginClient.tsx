@@ -247,25 +247,32 @@ async function handleVerifyOtp(e: FormEvent) {
     }
 
     setIsRedirecting(true);
-    router.replace(
-      out.role === "admin" ? "/admin/dashboard" : "/operator"
-    );
+
+    /**
+     * 🏢 ORGANİZASYON YOKSA
+     */
+    if (out.noOrganization === true) {
+      router.replace("/no-organization");
+      return;
+    }
+
+    /**
+     * 🎯 NORMAL ROLE BASED REDIRECT
+     */
+    const target =
+      out.role === "admin"
+        ? "/admin/dashboard"
+        : "/operator";
+
+    router.replace(target);
+
+  } catch (err) {
+    console.error("[OTP VERIFY ERROR]", err);
+    setError("Sunucuya ulaşılamıyor.");
   } finally {
     setVerifyingOtp(false);
-    // ❌ setIsRedirecting(false) → KALDIR
   }
 }
-
-const shownRef = useRef(false);
-
-useEffect(() => {
-  if (reason === "expired" && !shownRef.current) {
-    shownRef.current = true;
-    toast.warning("Oturum süresi doldu", {
-      description: "Güvenliğiniz için tekrar giriş yapmanız gerekiyor.",
-    });
-  }
-}, [reason]);
 
 
 async function handleLogin(
