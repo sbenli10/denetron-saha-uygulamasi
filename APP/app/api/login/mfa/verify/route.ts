@@ -11,7 +11,7 @@ import {
 import { parseDevice } from "@/lib/device";
 
 /**
- * 🔐 Device hash — SADECE BURADA ÜRETİLİR
+ * 🔐 Device hash — TEK KAYNAK
  */
 function hashDevice(agent: string, os: string) {
   return crypto
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     const supabase = supabaseServerClient(Boolean(rememberMe));
 
     /**
-     * 1️⃣ SESSION & USER HARD CHECK
+     * 1️⃣ SESSION CHECK
      */
     const { data: sessionRes } = await supabase.auth.getSession();
     if (!sessionRes.session) {
@@ -75,67 +75,52 @@ export async function POST(req: Request) {
     }
 
     /**
-     * 3️⃣ DEVICE HASH (TEK KAYNAK)
+     * 3️⃣ ORGANIZATION + ROLE CHECK
+     */
+    const admin = supabaseServiceRoleClient();
+
+    const { data: member } = await admin
+      .from("org_members")
+      .select("org_id, role")
+      .eq("user_id", user.id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    const hasOrganization = !!member?.org_id;
+    const userRole =
+      member?.role === "admin" ? "admin" : "operator";
+
+    /**
+     * 4️⃣ DEVICE HASH
      */
     const userAgent = req.headers.get("user-agent") ?? "unknown";
     const parsed = parseDevice(userAgent);
     const deviceHash = hashDevice(userAgent, parsed.os);
 
-    console.log("VERIFY DEVICE", {
-      ua: userAgent,
-      os: parsed.os,
-      hash: deviceHash,
-    });
-
     /**
-     * 4️⃣ TRUSTED DEVICE (OPSİYONEL)
+     * 5️⃣ TRUSTED DEVICE (OPSİYONEL)
      */
-    if (trustDevice === true) {
-      const admin = supabaseServiceRoleClient();
-
+    if (trustDevice === true && hasOrganization) {
       const trustedUntil = new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 gün
+        Date.now() + 30 * 24 * 60 * 60 * 1000
       ).toISOString();
 
       try {
-        // 🔐 org_id'yi GÜVENLİ kaynaktan al
-        const { data: member } = await admin
-          .from("org_members")
-          .select("org_id")
-          .eq("user_id", user.id)
-          .is("deleted_at", null)
-          .maybeSingle();
-
-        if (!member?.org_id) {
-          console.warn("⚠️ MFA VERIFY: org not found, skipping trusted device");
-        } else {
-          await admin.from("trusted_devices").upsert(
-            {
-              user_id: user.id,
-              org_id: member.org_id,
-              device_hash: deviceHash,
-              trusted_until: trustedUntil,
-            },
-            { onConflict: "user_id,org_id,device_hash" }
-          );
-
-          console.log("🟢 Trusted device saved", {
-            userId: user.id,
-            orgId: member.org_id,
-            deviceHash,
-            trustedUntil,
-          });
-        }
-
-
+        await admin.from("trusted_devices").upsert(
+          {
+            user_id: user.id,
+            org_id: member!.org_id,
+            device_hash: deviceHash,
+            trusted_until: trustedUntil,
+          },
+          { onConflict: "user_id,org_id,device_hash" }
+        );
 
         console.log("🟢 Trusted device saved", {
           userId: user.id,
-          deviceHash,
-          trustedUntil,
+          orgId: member!.org_id,
         });
       } catch (err: any) {
-        // ❗ Güvenlikten ödün vermeden devam et
         console.warn(
           "⚠️ Trusted device write failed",
           err?.message
@@ -144,33 +129,42 @@ export async function POST(req: Request) {
     }
 
     /**
-     * 5️⃣ RESPONSE + COOKIES
+     * 6️⃣ RESPONSE
      */
-    const res = NextResponse.json({ ok: true }, { status: 200 });
+    const res = NextResponse.json(
+      {
+        ok: true,
+        role: userRole,
+        noOrganization: !hasOrganization,
+      },
+      { status: 200 }
+    );
 
-    // MFA başarı cookie’si
+    /**
+     * 7️⃣ COOKIES
+     */
     res.cookies.set("mfa_ok", "1", {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: rememberMe
-        ? 60 * 60 * 24 * 30 // 30 gün
-        : 60 * 60 * 2,     // 2 saat
+        ? 60 * 60 * 24 * 30
+        : 60 * 60 * 2,
     });
 
-    // 🔑 DEVICE HASH COOKIE (KRİTİK)
     res.cookies.set("device_hash", deviceHash, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: 60 * 60 * 24 * 365, // 1 yıl
+      maxAge: 60 * 60 * 24 * 365,
     });
 
-    console.log("✅ MFA verified + cookies set", {
+    console.log("✅ MFA verified fully", {
       userId: user.id,
-      trustDevice: trustDevice === true,
+      role: userRole,
+      hasOrganization,
     });
 
     return res;
