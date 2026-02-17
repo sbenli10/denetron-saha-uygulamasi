@@ -52,26 +52,44 @@ export default function ResetPasswordPage() {
 
   const strength = useMemo(() => scorePassword(password), [password]);
 
-  // --- Token initialization (hash -> setSession) + expiration UX
 useEffect(() => {
   const init = async () => {
-    // Supabase hash'i otomatik işler
-    const { data, error } = await supabase.auth.getSession();
+    const hash = window.location.hash;
 
-    if (error || !data.session) {
+    if (!hash) {
       setTokenOk(false);
       setInitializing(false);
       return;
     }
 
-    setTokenOk(true);
+    const params = new URLSearchParams(hash.substring(1));
+    const access_token = params.get("access_token");
+    const refresh_token = params.get("refresh_token");
+
+    if (!access_token || !refresh_token) {
+      setTokenOk(false);
+      setInitializing(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.setSession({
+      access_token,
+      refresh_token,
+    });
+
+    if (error) {
+      setTokenOk(false);
+    } else {
+      setTokenOk(true);
+    }
+
     setInitializing(false);
+
+    window.history.replaceState(null, "", "/reset-password");
   };
 
   init();
 }, [supabase]);
-
-
 
   // --- Pwned password check (debounced) via server route (k-anonymity)
   const debounceRef = useRef<number | null>(null);
@@ -121,69 +139,41 @@ useEffect(() => {
     };
   }, [password]);
 
-  async function handleReset(e: React.FormEvent) {
-    e.preventDefault();
-    if (loading) return;
+async function handleReset(e: React.FormEvent) {
+  e.preventDefault();
+  if (loading) return;
 
-    setError("");
+  setError("");
 
-    if (!validatePassword(password)) {
-      setError("Şifre en az 8 karakter, bir büyük harf ve bir rakam içermelidir.");
-      return;
-    }
-    if (password !== confirm) {
-      setError("Şifreler eşleşmiyor.");
-      return;
-    }
-    // pwned ise blokla (gerekli dokunuş)
-    if (pwnedCount !== null && pwnedCount > 0) {
-      setError("Bu şifre güvenli değil. Lütfen farklı bir şifre seçin.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session?.access_token) {
-        setError("Oturum doğrulanamadı veya sıfırlama bağlantısının süresi dolmuş.");
-        setLoading(false);
-        return;
-      }
-
-      const res = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          password,
-          accessToken: data.session.access_token,
-        }),
-      });
-
-      if (res.status === 429) {
-        const retryAfter = res.headers.get("retry-after");
-        setError(
-          `Çok fazla deneme yapıldı. ${
-            retryAfter ? `${retryAfter} sn sonra tekrar deneyin.` : "Biraz sonra tekrar deneyin."
-          }`
-        );
-        setLoading(false);
-        return;
-      }
-
-      const out = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(out.error || "Şifre güncellenemedi. Lütfen tekrar deneyin.");
-        setLoading(false);
-        return;
-      }
-
-      setSuccess(true);
-      setTimeout(() => router.replace("/login"), 1800);
-    } catch {
-      setError("Sunucu hatası oluştu.");
-      setLoading(false);
-    }
+  if (!validatePassword(password)) {
+    setError("Şifre en az 8 karakter, bir büyük harf ve bir rakam içermelidir.");
+    return;
   }
+
+  if (password !== confirm) {
+    setError("Şifreler eşleşmiyor.");
+    return;
+  }
+
+  setLoading(true);
+
+  const { error } = await supabase.auth.updateUser({
+    password,
+  });
+
+  if (error) {
+    setError("Şifre güncellenemedi. Bağlantı süresi dolmuş olabilir.");
+    setLoading(false);
+    return;
+  }
+
+  setSuccess(true);
+
+  await supabase.auth.signOut();
+
+  setTimeout(() => router.replace("/login"), 1500);
+}
+
 
   // --- Expired / invalid token UX
   if (initializing) {
