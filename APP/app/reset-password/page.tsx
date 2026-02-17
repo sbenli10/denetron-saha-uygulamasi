@@ -53,48 +53,25 @@ export default function ResetPasswordPage() {
   const strength = useMemo(() => scorePassword(password), [password]);
 
   // --- Token initialization (hash -> setSession) + expiration UX
-  useEffect(() => {
-    let cancelled = false;
+useEffect(() => {
+  const init = async () => {
+    // Supabase hash'i otomatik işler
+    const { data, error } = await supabase.auth.getSession();
 
-    const init = async () => {
-      const hash = window.location.hash;
-      if (!hash) {
-        if (!cancelled) {
-          setTokenOk(false);
-          setInitializing(false);
-        }
-        return;
-      }
+    if (error || !data.session) {
+      setTokenOk(false);
+      setInitializing(false);
+      return;
+    }
 
-      const params = new URLSearchParams(hash.substring(1));
-      const access_token = params.get("access_token");
-      const refresh_token = params.get("refresh_token");
+    setTokenOk(true);
+    setInitializing(false);
+  };
 
-      if (!access_token || !refresh_token) {
-        if (!cancelled) {
-          setTokenOk(false);
-          setInitializing(false);
-        }
-        return;
-      }
+  init();
+}, [supabase]);
 
-      // set session
-      await supabase.auth.setSession({ access_token, refresh_token });
 
-      const { data } = await supabase.auth.getSession();
-      const ok = !!data.session?.access_token;
-
-      if (!cancelled) {
-        setTokenOk(ok);
-        setInitializing(false);
-      }
-    };
-
-    init();
-    return () => {
-      cancelled = true;
-    };
-  }, [supabase]);
 
   // --- Pwned password check (debounced) via server route (k-anonymity)
   const debounceRef = useRef<number | null>(null);
