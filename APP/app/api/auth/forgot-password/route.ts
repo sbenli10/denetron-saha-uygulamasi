@@ -104,7 +104,7 @@ export async function POST(req: Request) {
    /* ---------- SEND EMAIL ---------- */
     try {
     await resend.emails.send({
-        from: "Denetron <onboarding@resend.dev>",
+        from: 'no-reply@denetron.me',
         to: email,
         subject: "Denetron | Şifre Sıfırlama Talebi",
         html: `

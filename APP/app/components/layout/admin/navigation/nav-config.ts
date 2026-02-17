@@ -31,7 +31,7 @@ export const NAV_ITEMS: SidebarNavItem[] = [
      DASHBOARD
   ---------------------------------- */
   {
-    label: "📊 Dashboard",
+    label: "📊 Anasayfa",
     href: "/admin/dashboard",
     icon: LayoutGrid,
     roles: ["admin", "manager"],

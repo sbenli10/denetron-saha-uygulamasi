@@ -10,6 +10,14 @@ type PreviewFile = {
   file: File;
   preview: string;
 };
+type NoticeType = "success" | "error" | "warning" | "info";
+
+type Notice = {
+  message: string;
+  type: NoticeType;
+};
+
+
 
 export default function InspectionPhotoUploadPage() {
   const router = useRouter();
@@ -17,12 +25,14 @@ export default function InspectionPhotoUploadPage() {
   const [files, setFiles] = useState<PreviewFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
 
-  function showNotice(message: string) {
-    setNotice(message);
-    setTimeout(() => setNotice(null), 2500);
-  }
+
+  function showNotice(message: string, type: NoticeType = "info") {
+  setNotice({ message, type });
+  setTimeout(() => setNotice(null), 3000);
+}
+
 
   /* ---------------- ADD FILES (IMAGE ONLY) ---------------- */
 
@@ -60,52 +70,101 @@ export default function InspectionPhotoUploadPage() {
   }
 
   /* ---------------- UPLOAD (IMAGE ONLY) ---------------- */
+/* ---------------- UPLOAD (IMAGE ONLY) ---------------- */
+async function handleUpload() {
+  if (files.length === 0) {
+    showNotice("Yüklenecek fotoğraf bulunamadı", "warning");
+    return;
+  }
 
-  async function handleUpload() {
-    if (files.length === 0) {
-      showNotice("Yüklenecek fotoğraf bulunamadı");
+  if (files.some((f) => !f.file.type.startsWith("image/"))) {
+    showNotice("Sadece fotoğraf analiz edilebilir", "error");
+    return;
+  }
+
+  if (loading) return;
+
+  setLoading(true);
+  showNotice("Analiz başlatıldı...", "info");
+
+  const previews = files.map((f) => ({
+    name: f.file.name,
+    preview: f.preview,
+  }));
+
+  sessionStorage.setItem(
+    "isg_photo_previews",
+    JSON.stringify(previews)
+  );
+
+  const formData = new FormData();
+  files.forEach((f) => formData.append("files", f.file));
+
+  try {
+    const res = await fetch("/api/admin/isg/analyze/photo", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json().catch(() => null);
+
+    /* ---------------- HTTP ERROR ---------------- */
+    if (!res.ok) {
+      let message =
+        typeof data?.error === "string"
+          ? data.error
+          : data?.error?.message ||
+            data?.message ||
+            "Analiz sırasında hata oluştu";
+
+      if (res.status === 429) {
+        message = "Yapay zekâ kullanım limiti doldu. Daha sonra tekrar deneyin.";
+      }
+
+      if (res.status === 403) {
+        message = "Bu özellik premium üyelik gerektirir.";
+      }
+
+      if (res.status >= 500) {
+        message = "Sunucu hatası oluştu. Lütfen tekrar deneyin.";
+      }
+
+      showNotice(message, "error");
       return;
     }
 
-    // ekstra güvenlik
-    if (files.some((f) => !f.file.type.startsWith("image/"))) {
-      showNotice("Sadece fotoğraf analiz edilebilir");
+    /* ---------------- BUSINESS ERROR ---------------- */
+    if (!data?.success) {
+      showNotice(
+        data?.error?.message || "Analiz başarısız",
+        "error"
+      );
       return;
     }
 
-    setLoading(true);
-    showNotice("Analiz başlatıldı");
-
-    // 🔥 PREVIEW'LERİ KAYDET
-    const previews = files.map((f) => ({
-      name: f.file.name,
-      preview: f.preview,
-    }));
-
+    /* ---------------- SUCCESS ---------------- */
     sessionStorage.setItem(
-      "isg_photo_previews",
-      JSON.stringify(previews)
+      "isg_result",
+      JSON.stringify(data)
     );
 
-    const formData = new FormData();
-    files.forEach((f) => formData.append("files", f.file));
+    showNotice("Analiz tamamlandı", "success");
 
-    try {
-      const res = await fetch("/api/admin/isg/analyze/photo", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) throw new Error();
+    setTimeout(() => {
+      router.push("/admin/isg/risk-analysis/result");
+    }, 600);
 
-      const data = await res.json();
-      sessionStorage.setItem("isg_result", JSON.stringify(data));
-      router.push("/admin/isg/result");
-    } catch {
-      showNotice("Analiz sırasında hata oluştu");
-    } finally {
-      setLoading(false);
-    }
+  } catch (err) {
+    console.error("ISG upload/analyze failed:", err);
+    showNotice(
+      "Analiz sırasında beklenmeyen bir hata oluştu",
+      "error"
+    );
+  } finally {
+    setLoading(false);
   }
+}
+
 
   /* ---------------- CLEANUP (UNMOUNT ONLY) ---------------- */
 
@@ -210,10 +269,22 @@ export default function InspectionPhotoUploadPage() {
       </button>
 
       {notice && (
-        <div className="fixed bottom-8 right-8 rounded-xl bg-gray-900 text-white px-5 py-3 text-sm shadow-xl">
-          {notice}
+        <div
+          className={`fixed bottom-8 right-8 rounded-xl px-5 py-3 text-sm shadow-xl text-white
+            ${
+              notice.type === "error"
+                ? "bg-red-600"
+                : notice.type === "success"
+                ? "bg-green-600"
+                : notice.type === "warning"
+                ? "bg-yellow-600"
+                : "bg-gray-900"
+            }`}
+        >
+          {notice.message}
         </div>
       )}
+
     </div>
   );
 }

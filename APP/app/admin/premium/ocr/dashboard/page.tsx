@@ -12,6 +12,7 @@ import {
   ChevronRight,
   HelpCircle,
   AlertTriangle,
+  ShieldCheck
 } from "lucide-react";
 import { ThisMonthWidget } from "./components/ThisMonthWidget";
 
@@ -68,51 +69,52 @@ export default function ISGAssistantDashboard() {
           </Link>
         </div>
 
-        {/* CORE DOCUMENTS */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* ================= ISG DASHBOARD CARDS ================= */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+
           <ActionCard
-            icon={<ClipboardList size={34} />}
+            icon={<ClipboardList size={30} />}
             title="Yıllık İSG Çalışma Planı"
-            desc="Ocak ayında revize edilen zorunlu plan"
-            help="İSG faaliyetleri, periyotlar, sorumlular ve mevzuat uyumu otomatik analiz edilir."
+            desc="6331 kapsamında zorunlu ana plan dokümanı"
+            help="Faaliyet takvimi, periyotlar, sorumlular ve yasal yükümlülükler ISO 45001 perspektifiyle analiz edilir."
             href="/admin/isg/annual-plan"
           />
 
           <ActionCard
-            icon={<GraduationCap size={34} />}
+            icon={<GraduationCap size={30} />}
             title="Yıllık Eğitim Planı"
-            desc="Eğitim süreleri ve tekrar zorunlulukları"
-            help="Eğitim konuları, süreler, muafiyetler ve eksikler tespit edilir."
+            desc="Yasal süre ve tekrar yükümlülüğü kontrolü"
+            help="Eğitim konuları ve tekrar süreleri mevzuata uygunluk açısından değerlendirilir."
             href="/admin/isg/training"
           />
 
           <ActionCard
-            icon={<AlertTriangle size={34} />}
-            title="DÖF / Uygunsuzluk Formu"
-            desc="Asıl takip edilmesi gereken belge"
-            help="Tespit edilen uygunsuzluklar için risk seviyesi, aksiyon ve takip oluşturur."
-            href="/admin/isg/dof"
+            icon={<ShieldCheck size={30} />}
+            title="Risk Analizi (Fine–Kinney)"
+            desc="Risk skor doğrulama ve önceliklendirme"
+            help="Risk değerleri yeniden hesaplanır ve kritik riskler önceliklendirilir."
+            href="/admin/isg/risk-analysis"
           />
-        </section>
 
-        {/* SUPPORTING INPUTS */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <ActionCard
-            icon={<Camera size={34} />}
-            title="Sahadan Fotoğraf (Destekleyici)"
-            desc="Görsel kanıt ve risk destekleyici"
-            help="Fotoğraflar doğrudan DÖF ve plan analizlerini destekler."
+            icon={<Camera size={30} />}
+            title="Saha Görsel Analizi"
+            desc="AI destekli tehlike ve risk tespiti"
+            help="Fotoğraflardaki tehlikeler analiz edilir ve aksiyon önerileri üretilir."
             href="/admin/isg/photo"
           />
 
           <ActionCard
-            icon={<FileText size={34} />}
-            title="Belgeden Şablon Oluştur"
-            desc="Her yıl aynı formatı otomatikleştir"
-            help="Yıllık plan ve DÖF formlarını tekrar tekrar kullanmak için şablon oluştur."
+            icon={<FileText size={30} />}
+            title="Belgeden Akıllı Şablon"
+            desc="Tekrarlayan süreçleri standardize edin"
+            help="Belgeler analiz edilerek tekrar kullanılabilir şablonlar oluşturulur."
             href="/admin/premium/ocr/create"
           />
+
         </section>
+
+
 
         {/* THIS MONTH WIDGET */}
         {!loading && planItems.length > 0 && (
@@ -144,15 +146,22 @@ function Hero() {
   return (
     <section className="space-y-4">
       <h1 className="text-5xl font-semibold tracking-tight">
-        İSG İş Asistanı
+        Yapay Zekâ Destekli İSG Yönetim Platformu
       </h1>
+      <span className="inline-flex items-center rounded-full bg-indigo-50 px-4 py-1 text-sm font-medium text-indigo-700">
+        AI-Powered | ISO 45001 Referanslı | Denetim Hazırlık Sistemi
+      </span>
+
       <p className="max-w-3xl text-xl text-gray-600 dark:text-[#A0A7B8]">
-        Yıllık İSG planları, eğitim dokümanları ve DÖF süreçlerini
-        Yapay zekâ ile analiz edin, denetime hazır hale gelin.
+        ISO 45001 ve 6331 sayılı İş Sağlığı ve Güvenliği Kanunu referanslı
+        akıllı analiz motoru ile planlarınızı değerlendirin,
+        riskleri puanlayın, uygunsuzlukları tespit edin
+        ve kurumsal uyumluluğunuzu dijital olarak yönetin.
       </p>
     </section>
   );
 }
+
 
 /* --------------------------------------------------------
    ACTION CARD

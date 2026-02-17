@@ -110,7 +110,7 @@ export async function POST(req: Request) {
       const inviteUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/invite/${token}`;
 
       const { data, error: emailError } = await resend.emails.send({
-        from: "Denetron <onboarding@resend.dev>",
+        from: 'no-reply@denetron.me',
         to: email,
         subject: "Denetron Organizasyon Daveti",
         html: premiumInviteTemplate({
@@ -123,13 +123,17 @@ export async function POST(req: Request) {
       console.log("RESEND KEY EXISTS:", !!process.env.RESEND_API_KEY);
 
       if (emailError) {
-        console.error(`[invites][${requestId}] email_error`, emailError);
+        await supabase
+          .from("invites")
+          .delete()
+          .eq("token", token);
 
         return NextResponse.json(
           { error: "Email gönderilemedi" },
           { status: 500 }
         );
       }
+
 
     }
 

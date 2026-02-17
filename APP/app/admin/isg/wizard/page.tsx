@@ -7,12 +7,14 @@ import {
   FileText,
   GraduationCap,
   ArrowRight,
+  ShieldCheck, // yeni ikon
 } from "lucide-react";
 
 type Choice =
   | "photo"
   | "inspection"
   | "training"
+  | "risk-analysis"   // ✅ yeni eklendi
   | null;
 
 export default function ISGWizardPage() {
@@ -25,11 +27,17 @@ export default function ISGWizardPage() {
     if (choice === "photo") {
       router.push("/admin/isg/photo");
     }
+
     if (choice === "inspection") {
       router.push("/admin/isg/inspection");
     }
+
     if (choice === "training") {
       router.push("/admin/isg/training");
+    }
+
+    if (choice === "risk-analysis") {
+      router.push("/admin/isg/risk-analysis"); // ✅ yeni route
     }
   }
 
@@ -43,17 +51,18 @@ export default function ISGWizardPage() {
             Ne yüklemek istiyorsunuz?
           </h1>
           <p className="text-gray-600">
-            Elinizdeki belge veya görsele göre sizi doğru ekrana yönlendireceğiz.
+            Belge veya görsele göre sizi doğru analiz ekranına yönlendireceğiz.
           </p>
         </header>
 
         {/* OPTIONS */}
         <div className="space-y-4">
+
           <Option
             active={choice === "photo"}
             icon={<Camera />}
             title="Sahada çekilmiş fotoğraf"
-            desc="Makine, çalışan, ortam, uygunsuzluk fotoğrafı"
+            desc="Makine, çalışan, ortam veya uygunsuzluk görseli"
             onClick={() => setChoice("photo")}
           />
 
@@ -72,6 +81,16 @@ export default function ISGWizardPage() {
             desc="İmzalı eğitim formları"
             onClick={() => setChoice("training")}
           />
+
+          {/* ✅ YENİ RİSK ANALİZİ KARTI */}
+          <Option
+            active={choice === "risk-analysis"}
+            icon={<ShieldCheck />}
+            title="Risk Analizi (Excel / Tablo)"
+            desc="Fine-Kinney veya genel risk analiz dosyası"
+            onClick={() => setChoice("risk-analysis")}
+          />
+
         </div>
 
         {/* ACTION */}
