@@ -170,11 +170,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
-
-  const [rememberMe, setRememberMe] = useState(false);
+  const [forgotNotice, setForgotNotice] = useState<string | null>(null);
+  const [rememberMe] = useState(false);
   const [loginRole, setLoginRole] = useState<"operator" | "owner">("operator"); 
   const [forgotLoading, setForgotLoading] = useState(false);
-  const [, setForgotSuccess] = useState(false);
   const [, setPendingLogin] = useState<{
   role: "admin" | "operator";
   
@@ -187,6 +186,7 @@ async function handleForgotPassword() {
 
   setForgotLoading(true);
   setError("");
+  setForgotNotice(null);
 
   try {
     const res = await fetch("/api/auth/forgot-password", {
@@ -195,21 +195,24 @@ async function handleForgotPassword() {
       body: JSON.stringify({ email }),
     });
 
-    const out = await res.json();
-
     if (!res.ok) {
-      setError(out.error || "Şifre sıfırlama maili gönderilemedi.");
-      setForgotLoading(false);
+      setError("Şifre sıfırlama isteği gönderilemedi. Lütfen tekrar deneyin.");
       return;
     }
 
-    setForgotSuccess(true);
+    setForgotNotice(
+      "Eğer bu email sistemde kayıtlıysa, şifre sıfırlama bağlantısı gönderildi."
+    );
+
   } catch {
-    setError("Sunucuya ulaşılamıyor.");
+    setError("Sunucuya ulaşılamıyor. Lütfen tekrar deneyin.");
   } finally {
     setForgotLoading(false);
   }
 }
+
+
+
 
 async function handleVerifyOtp(e: FormEvent) {
   e.preventDefault();
@@ -456,6 +459,13 @@ return (
                 </div>
               )}
 
+              {forgotNotice && (
+                <div className="text-emerald-400 text-sm bg-emerald-500/10 border border-emerald-500/30 px-4 py-3 rounded-xl">
+                  {forgotNotice}
+                </div>
+              )}
+
+
               {/* EMAIL */}
               <div className="space-y-1">
                 <label className="text-xs uppercase tracking-wide text-white/60">
@@ -472,6 +482,7 @@ return (
                   onChange={(e) => {
                     setEmail(e.target.value);
                     setError("");
+                    setForgotNotice(null); // 👈 ekle
                   }}
                 />
               </div>
