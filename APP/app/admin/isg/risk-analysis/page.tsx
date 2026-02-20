@@ -31,10 +31,15 @@ export default function RiskAnalysisUploadPage() {
 
   const [dragActive, setDragActive] = useState(false);
   
-  function showNotice(message: string, type: NoticeType = "info") {
-  setNotice({ message, type });
-  setTimeout(() => setNotice(null), 3000);
-}
+  function showNotice(
+    message: string,
+    type: NoticeType = "info",
+    duration = 5000
+  ) {
+    setNotice({ message, type });
+    setTimeout(() => setNotice(null), duration);
+  }
+
 
   function validateFile(selected: File) {
     if (
@@ -68,14 +73,21 @@ export default function RiskAnalysisUploadPage() {
 
  async function handleUpload() {
   if (!file) {
-    showNotice("Yüklenecek risk analizi dosyası bulunamadı");
+    showNotice(
+      "Lütfen analiz etmek istediğiniz risk analizi Excel dosyasını seçin.",
+      "warning"
+    );
     return;
   }
 
   if (loading) return;
 
   setLoading(true);
-  showNotice("Risk analizi inceleniyor...");
+  showNotice(
+    "Risk analizi dosyası işleniyor. Bu işlem birkaç saniye sürebilir...",
+    "info",
+    5000
+  );
 
   const formData = new FormData();
   formData.append("file", file.file);
@@ -86,51 +98,100 @@ export default function RiskAnalysisUploadPage() {
       body: formData,
     });
 
-    const data = await res.json().catch(() => null);
+    let data: any = null;
 
-    // ===== STATUS BAZLI GERİ BİLDİRİM =====
+    try {
+      data = await res.json();
+    } catch {
+      // JSON parse edilemezse sessiz geç
+    }
+
+    /* ================================
+       HTTP STATUS BAZLI GERİ BİLDİRİM
+    ================================= */
 
     if (!res.ok) {
+      const backendMessage =
+        data?.error?.message ||
+        "Risk analizi sırasında beklenmeyen bir hata oluştu.";
+
       switch (res.status) {
         case 400:
-          showNotice(data?.error?.message || "Dosya hatalı");
-          return;
+          showNotice(
+            backendMessage ||
+              "Yüklenen dosya geçersiz. Lütfen Excel formatında (.xls, .xlsx) bir dosya seçin.",
+            "error"
+          );
+          break;
 
         case 403:
-          showNotice("Bu özellik premium üyelik gerektirir");
-          return;
+          showNotice(
+            "Bu özellik premium üyelik gerektirir. Lütfen planınızı yükseltin.",
+            "warning"
+          );
+          break;
+
+        case 422:
+          showNotice(
+            "Excel dosyası okunamadı. Dosya bozuk, şifreli veya desteklenmeyen formatta olabilir.",
+            "error"
+          );
+          break;
 
         case 429:
           showNotice(
             data?.error?.code === "AI_QUOTA_EXCEEDED"
-              ? "Yapay zekâ kullanım limiti doldu"
-              : "Çok fazla istek gönderildi. Lütfen bekleyin."
+              ? "Yapay zekâ kullanım limitiniz doldu. Lütfen daha sonra tekrar deneyin."
+              : "Sistem şu anda yoğun. Lütfen birkaç dakika sonra tekrar deneyin.",
+            "warning"
           );
-          return;
+          break;
 
         case 504:
-          showNotice("Analiz süresi aşıldı. Daha küçük dosya deneyin.");
-          return;
-
-        case 422:
-          showNotice("Excel dosyası okunamadı veya bozuk olabilir.");
-          return;
+          showNotice(
+            "Yapay zekâ yorumu zaman aşımına uğradı. Risk skorları hesaplandı ancak detaylı mevzuat analizi oluşturulamadı.",
+            "warning",
+            6000
+          );
+          break;
 
         default:
-          showNotice("Risk analizi sırasında hata oluştu");
-          return;
+          showNotice(backendMessage, "error");
       }
-    }
 
-    if (!data?.success) {
-      showNotice(data?.error?.message || "Analiz başarısız");
       return;
     }
 
-    // ⚠️ Warning varsa kullanıcıya göster
-    if (data?.warnings?.length) {
-      showNotice("Analiz tamamlandı ancak bazı uyarılar mevcut");
+    /* ================================
+       BAŞARILI RESPONSE KONTROLÜ
+    ================================= */
+
+    if (!data?.success) {
+      showNotice(
+        data?.error?.message ||
+          "Risk analizi tamamlanamadı. Lütfen dosyanızı kontrol edin.",
+        "error"
+      );
+      return;
     }
+
+    /* ================================
+       WARNINGS VARSA BİLGİLENDİR
+    ================================= */
+
+    if (data?.warnings?.length) {
+      showNotice(
+        "Analiz tamamlandı ancak bazı uyarılar mevcut. Detayları sonuç sayfasında inceleyebilirsiniz.",
+        "warning",
+        6000
+      );
+    } else {
+      showNotice("Risk analizi başarıyla tamamlandı.", "success");
+    }
+
+    /* ================================
+       SONUÇ SAYFASINA YÖNLENDİR
+    ================================= */
 
     sessionStorage.setItem(
       "risk_analysis_result",
@@ -140,12 +201,18 @@ export default function RiskAnalysisUploadPage() {
     router.push("/admin/isg/risk-analysis/result");
 
   } catch (err) {
-    console.error("RISK_ANALYSIS_FAILED", err);
-    showNotice("Sunucuya ulaşılamadı. Bağlantınızı kontrol edin.");
+    console.error("RISK_ANALYSIS_NETWORK_ERROR", err);
+
+    showNotice(
+      "Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin ve tekrar deneyin.",
+      "error",
+      6000
+    );
   } finally {
     setLoading(false);
   }
 }
+
 
   return (
     <div className="max-w-2xl mx-auto py-16 px-4 space-y-10 text-gray-900">

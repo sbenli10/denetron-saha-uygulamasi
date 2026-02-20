@@ -12,7 +12,8 @@ export const runtime = "nodejs";
 ====================================================== */
 
 const MAX_FILE_SIZE_MB = 12;
-const REQUEST_TIMEOUT_MS = 18_000;
+const REQUEST_TIMEOUT_MS = 45_000;
+
 
 // Excel preview limits (AI prompt şişmesin)
 const PREVIEW_MAX_SHEETS = 8;
@@ -642,7 +643,7 @@ return clampString(prompt, PROMPT_MAX_CHARS);
    GEMINI CALL (retry/backoff)
 ====================================================== */
 
-async function callGeminiJSON(prompt: string) {
+async function callGeminiJSON(prompt: string): Promise<string | null> {
   if (!process.env.GOOGLE_API_KEY) {
     throw { type: "CONFIG", message: "GOOGLE_API_KEY missing" };
   }
@@ -653,8 +654,7 @@ async function callGeminiJSON(prompt: string) {
     model: process.env.GOOGLE_MODEL || "gemini-2.5-flash",
     generationConfig: {
       temperature: 0,
-      maxOutputTokens: 1800,
-      responseMimeType: "application/json",
+      maxOutputTokens: 1100,
     },
   });
 
@@ -690,14 +690,15 @@ ${text}
 
     } catch (err: any) {
       if (err?.status === 429) {
-        await sleep(attempt * 1500);
+        await sleep(1000 * Math.pow(2, attempt))
         continue;
       }
       throw err;
     }
   }
 
-  throw { type: "AI_ERROR", message: "Gemini failed after retries" };
+  return null;
+
 }
 
 /* ======================================================
@@ -917,10 +918,15 @@ export async function POST(req: Request) {
       model: process.env.GOOGLE_MODEL || "gemini-2.5-flash",
     });
 
-    let aiText = "";
+    let aiText: string | null = null;
 
     try {
       aiText = await withTimeout(callGeminiJSON(prompt), REQUEST_TIMEOUT_MS);
+
+      if (!aiText) {
+        warnings.push("Yapay zekâ geçerli bir çıktı üretemedi. Temel analiz gösteriliyor.");
+      }
+
 
       log("INFO", requestId, "AI_CALL_SUCCESS", {
         responseLength: aiText?.length ?? 0,
@@ -940,27 +946,52 @@ export async function POST(req: Request) {
       }
 
       if (err?.message === "TIMEOUT") {
-        log("WARN", requestId, "AI_TIMEOUT");
+        warnings.push("Yapay zekâ analiz süresi aşıldı. Temel risk analizi gösteriliyor.");
 
-        return errorResponse("AI_TIMEOUT", "Analiz süresi aşıldı. Daha küçük dosya ile tekrar deneyin.", 504, {
-          requestId,
+        return NextResponse.json({
+          success: true,
+          type: "risk-analysis",
+          fileName: file.name,
+          primarySheetName,
+          analysis: null,
+          deterministic,
+          warnings,
+          meta: {
+            aiTimeout: true,
+            requestId,
+          },
         });
       }
+
 
       log("ERROR", requestId, "AI_FAILED", {
         errorType: err?.type ?? null,
         error: err?.message ?? err,
       });
 
-      return errorResponse("AI_FAILED", "Risk analizi incelenirken bir hata oluştu.", 500, {
-        requestId,
+      warnings.push("Yapay zekâ yorumu üretilemedi. Temel analiz gösteriliyor.");
+
+      return NextResponse.json({
+        success: true,
+        type: "risk-analysis",
+        fileName: file.name,
+        primarySheetName,
+        analysis: null,
+        deterministic,
+        warnings,
+        meta: {
+          requestId,
+          aiFailed: true,
+        },
       });
+
     }
 
     /* ---------------- SAFE JSON PARSE ---------------- */
     log("TRACE", requestId, "AI_JSON_PARSE_START");
 
-    const parsed = extractJsonObject(aiText);
+    const parsed = aiText ? extractJsonObject(aiText) : null;
+
 
     if (!parsed) {
       warnings.push("AI çıktısı JSON formatında okunamadı. Deterministic analiz gösterilecek.");
@@ -996,7 +1027,8 @@ export async function POST(req: Request) {
       primarySheetName,
 
       analysis: parsed || null,
-      aiRaw: parsed ? undefined : aiText,
+      aiRaw: parsed ? undefined : aiText ?? undefined,
+
 
       deterministic: deterministic || null,
 

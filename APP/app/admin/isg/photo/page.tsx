@@ -151,7 +151,7 @@ async function handleUpload() {
     showNotice("Analiz tamamlandı", "success");
 
     setTimeout(() => {
-      router.push("/admin/isg/risk-analysis/result");
+      router.push("/admin/isg/result");
     }, 600);
 
   } catch (err) {
