@@ -285,16 +285,6 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
               className="p-0 focus:bg-transparent"
               onSelect={(e) => {
                 e.preventDefault();
-                router.push("/profil");
-              }}
-            >
-              <ActionRow icon={User} label="👤 Profil" />
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              className="p-0 focus:bg-transparent"
-              onSelect={(e) => {
-                e.preventDefault();
                 router.push("/admin/settings");
               }}
             >

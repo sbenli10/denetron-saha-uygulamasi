@@ -1,3 +1,4 @@
+//APP\app\admin\isg\training\[executionId]\page.tsx
 "use client";
 export const dynamic = "force-dynamic";
 
