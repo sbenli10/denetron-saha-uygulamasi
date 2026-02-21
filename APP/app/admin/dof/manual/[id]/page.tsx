@@ -414,40 +414,56 @@ export default function ManualDofDetailPage() {
                 )}
               </div>
 
-              {/* EVIDENCE */}
               <div className="space-y-3 border-t pt-4">
-                {!isReadOnly && (
-                  <button
-                    onClick={() => setEvidenceFor(item.id)}
-                    className="w-full sm:w-auto rounded-lg border px-3 py-2 sm:py-1.5 text-sm hover:bg-gray-50"
-                  >
-                    Kanıt Ekle
-                  </button>
-                )}
-
                 {item.files && item.files.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Resimler</p>
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
                       {item.files.map(f => (
+                      <div
+                        key={f.id}
+                        className="group relative overflow-hidden rounded-lg border"
+                      >
                         <a
-                          key={f.id}
                           href={f.file.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="group relative overflow-hidden rounded-lg border"
                         >
                           <img
                             src={f.file.url}
                             className="h-44 sm:h-32 w-full object-cover group-hover:opacity-90"
                           />
-                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/30">
-                            <span className="rounded bg-black/60 px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100">
-                              Görüntüle
-                            </span>
-                          </div>
                         </a>
+
+                          {/* 🔥 SİL BUTONU */}
+                          {!isReadOnly && (
+                            <button
+                              onClick={async () => {
+                                const ok = confirm("Bu fotoğraf silinsin mi?");
+                                if (!ok) return;
+
+                                const res = await fetch("/api/dof/manual/delete-item-file", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ file_id: f.id }),
+                                });
+
+                                const json = await res.json();
+
+                                if (!res.ok) {
+                                  alert(json.error || "Fotoğraf silinemedi.");
+                                  return;
+                                }
+
+                                mutate(); // listeyi yenile
+                              }}
+                              className="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition"
+                            >
+                              Sil
+                            </button>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>

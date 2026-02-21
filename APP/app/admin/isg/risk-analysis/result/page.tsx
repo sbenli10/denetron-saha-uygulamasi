@@ -52,7 +52,34 @@ export default function RiskAnalysisResultPage() {
     }
   }, [router]);
 
-  const analysis = data?.analysis ?? data?.deterministic ?? null;
+  // page.tsx içindeki analysis useMemo bloğunu bu haliyle değiştir
+    const analysis = useMemo(() => {
+      if (!data) return null;
+
+      // AI Başarılıysa
+      if (data.analysis && data.analysis.topRisks) {
+        return {
+          ...data.analysis,
+          // Eğer AI stats göndermeyi unuttuysa deterministic'den çek
+          stats: data.analysis.stats || data.deterministic,
+          managementActionPlan: data.analysis.managementActionPlan || [],
+          complianceGaps: data.analysis.complianceGaps || []
+        };
+      }
+
+      // AI Başarısızsa veya Fallback modundaysa
+      if (data.deterministic) {
+        return {
+          documentSummary: "Analiz özeti oluşturuluyor...",
+          stats: data.deterministic,
+          topRisks: data.deterministic.topRisks || [],
+          managementActionPlan: [],
+          complianceGaps: []
+        };
+      }
+
+      return null;
+    }, [data]);
 
     const highRiskCount = useMemo(() => {
     if (!analysis?.topRisks) return 0;
@@ -97,6 +124,7 @@ export default function RiskAnalysisResultPage() {
         {/* SUMMARY CARDS */}
         <section className="grid grid-cols-1 md:grid-cols-4 gap-6">
 
+         {/* Toplam Risk Kartı Örneği */}
           <StatCard
             icon={<ShieldAlert size={20} />}
             title="Toplam Risk"

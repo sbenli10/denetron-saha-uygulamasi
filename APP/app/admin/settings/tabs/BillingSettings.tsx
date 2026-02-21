@@ -1,3 +1,4 @@
+//APP\app\admin\settings\tabs\BillingSettings.tsx
 "use client";
 
 import { useState } from "react";
@@ -45,7 +46,17 @@ export default function BillingSettings({
   const [loading, setLoading] = useState(false);
 
   const isAdmin = role === "admin";
-  const isPremium = subscription.plan === "premium";
+  const isPremium =
+  (
+    subscription.plan === "premium" &&
+    subscription.status === "active"
+  ) ||
+  (
+    subscription.plan === "trial" &&
+    subscription.status === "active" &&
+    subscription.expires_at &&
+    new Date(subscription.expires_at) > new Date()
+  );
   const isTrial = subscription.plan === "trial";
 
   const canStartTrial =
