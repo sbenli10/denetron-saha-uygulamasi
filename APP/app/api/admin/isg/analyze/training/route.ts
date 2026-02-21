@@ -95,9 +95,43 @@ function nowMs() {
 
 function safeJsonParse<T>(raw: string): T | null {
   try {
-    const clean = raw.replace(/```json|```/g, "").trim();
+    if (!raw) return null;
+
+    // 1. Adım: Markdown bloklarını temizle ve gereksiz boşlukları at
+    let clean = raw.replace(/```json|```/g, "").trim();
+
+    // 2. Adım: Eğer AI JSON'dan önce veya sonra metin yazdıysa, sadece { ... } veya [ ... ] arasını al
+    const startBrace = clean.indexOf('{');
+    const startBracket = clean.indexOf('[');
+    let firstTokenIdx = -1;
+
+    if (startBrace !== -1 && (startBracket === -1 || startBrace < startBracket)) {
+      firstTokenIdx = startBrace;
+    } else {
+      firstTokenIdx = startBracket;
+    }
+
+    if (firstTokenIdx !== -1) {
+      const lastBrace = clean.lastIndexOf('}');
+      const lastBracket = clean.lastIndexOf(']');
+      const lastTokenIdx = Math.max(lastBrace, lastBracket);
+      
+      if (lastTokenIdx !== -1) {
+        clean = clean.slice(firstTokenIdx, lastTokenIdx + 1);
+      }
+    }
+
+    // 3. Adım: JSON içindeki görünmez kontrol karakterlerini ve hatalı satır sonlarını temizle
+    // (Bazen Excel verisinden gelen karakterler JSON'u bozabilir)
+    clean = clean.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+
     return JSON.parse(clean) as T;
-  } catch {
+  } catch (error) {
+    // Geliştirme aşamasında hatayı görmek için log ekliyoruz
+    console.error("Critical JSON Parse Error:", {
+      error: error instanceof Error ? error.message : String(error),
+      rawSnippet: raw.slice(0, 100) + "..." // Sadece başını logla ki ekran dolmasın
+    });
     return null;
   }
 }
@@ -367,70 +401,64 @@ export async function POST(req: Request) {
       { modelName, hasApiKey: true }
     );
 
-/* ===== 6) PROFESYONEL İSG DENETÇİSİ PROMPT ===== */
+/* ===== 7) ÇOKLU BELGE DESTEKLİ PROFESYONEL İSG DENETÇİSİ PROMPT ===== */
 const prompt = `
 ROL:
-Sen, Çalışanların İş Sağlığı ve Güvenliği Eğitimlerinin Usul ve Esasları Hakkında Yönetmelik konusunda uzman, kıdemli bir İSG BAŞ DENETÇİSİ VE PLANLAMA ASİSTANISIN.
+Sen, T.C. Çalışanların İş Sağlığı ve Güvenliği Eğitimlerinin Usul ve Esasları Hakkında Yönetmelik konusunda uzman, kıdemli bir İSG BAŞ DENETÇİSİSİN.
 
 AMACIN:
-Yüklenen belgeleri (Plan, Liste, Sertifika) inceleyerek; işletmenin eğitim uyumluluğunu yasal mevzuat, denetim standartları ve işveren mali sorumluluğu açısından analiz etmektir.
+Yüklenen farklı formattaki belgeleri (Excel planlar, PDF sertifikalar, fotoğraf formatındaki katılım listeleri vb.) bir bütün olarak analiz etmek ve işletmenin "Yasal Eğitim Uyumluluk Raporu"nu oluşturmaktır.
 
-YÖNETİCİ ÖZETİ (summary.note) TALİMATLARI:
-- Eğer eğitim planında konular tanımlanmış ancak takvim (aylar) boşsa; bunu yasal bir risk olarak vurgula. 
-- Şu ifadeyi temel al: "6331 Sayılı Kanun uyarınca, takvimlendirilmemiş bir eğitim listesi yasal olarak 'geçersiz' kabul edilebilir. Bu durum, olası bir iş kazasında veya Bakanlık denetiminde 'Eğitim Planı Yok' hükmünde değerlendirilerek tam kusur sayılma ve idari para cezası riski taşır."
-- Denetron sisteminin bu boşluğu kapatmak için sunduğu profesyonel takvim önerisinin kritik önemini belirt ve kullanıcıyı planı onaylamaya teşvik et.
+ÇOKLU BELGE ANALİZ MANTIĞI:
+- ÇAPRAZ KONTROL: Eğer bir belge "Plan" (Excel/PDF) ve diğeri "Kanıt/Sertifika" (Görsel/PDF) ise, bu ikisini eşleştir. Planlanan bir eğitimin kanıtı varsa statüsünü "Geçerli" yap.
+- VERİ ÖNCELİĞİ: Islak imzalı katılım listeleri veya resmi sertifikalar (Görsel/PDF), Excel'deki beyanlardan daha yüksek kanıt değerine sahiptir.
+- TUTARSIZLIK TESPİTİ: Planda görünen ancak kanıtı (sertifikası/listesi) bulunmayan eğitimleri "Planlanmış Ancak Kanıt Eksik" veya "Süresi Dolmuş" olarak işaretle.
+
+ZORUNLU ANALİZ KURALLARI (summary.note İÇİN):
+- Eğer bir eğitim takvimi (aylar) boşsa veya planlanan eğitimlerin yasal kanıtı (katılım listesi vb.) yüklenmemişse, "summary.note" alanını şu 3 aşamalı yapı ile doldur:
+  1. TESPİT: Belgeler arasındaki ilişkiyi açıkla (Örn: "Yıllık plan sunulmuş ancak 29 zorunlu eğitim başlığı için kanıtlayıcı belge/katılım listesi bulunamamıştır.")
+  2. YASAL RİSK: "6331 Sayılı Kanun uyarınca, takvimlendirilmemiş veya kanıtlanamayan eğitimler denetimlerde 'Geçersiz' sayılır. Bu durum, olası bir iş kazasında işverenin 'Eğitim Yükümlülüğünü Yerine Getirmediği' gerekçesiyle tam kusurlu sayılmasına ve ağır idari para cezalarına yol açabilir."
+  3. ÇÖZÜM: "Denetron, yasal riskinizi bertaraf etmek için eksik olan tüm başlıkları kapsayan profesyonel bir takvim önerisi oluşturmuştur. Bu planın onaylanarak sistem üzerinden takibinin yapılması hayati önemdedir."
+- DİL: Ciddi, otoriter, kurumsal ve ikna edici bir denetçi dili kullan.
 
 DEĞERLENDİRME PRENSİPLERİ:
-- TÜRKİYE MEVZUAT UYUMU: Eğitim periyotlarını tehlike sınıfına göre (Çok Tehlikeli: 1 yıl, Tehlikeli: 2 yıl, Az Tehlikeli: 3 yıl) denetle.
-- KANIT ODAKLILIK: Yalnızca belgede açıkça doğrulanabilen veriye dayan; tarih veya geçerlilik teyit edilemiyorsa "Belirsiz" statüsünü kullan.
-- YAPISAL ANALİZ: Eğitimleri; Genel, Sağlık ve Teknik konular şeklinde kategorize ederek yasal eksiklik taraması yap.
+- Tehlike Sınıfı Periyotları: Çok Tehlikeli (1 yıl), Tehlikeli (2 yıl), Az Tehlikeli (3 yıl). Belgede tehlike sınıfı yoksa "Az Tehlikeli" varsay ama notta belirt.
+- Süre Kontrolü: İSG eğitimlerinin yönetmelikteki minimum saatlerine (8, 12, 16 saat) uygunluğunu denetle.
 
-RİSK VE DURUM PARAMETRELERİ:
-- En az bir yasal zorunlu eğitimin periyodu geçmişse: riskLevel = "Yüksek".
-- Takvimlendirme yapılmamış veya içerik belirsizse: overallStatus = "Kısmen Uygun".
-- Temel İSG eğitim başlıklarının çoğunluğu eksikse: overallStatus = "Uygun Değil".
-
-JSON FORMAT KURALLARI:
+JSON FORMAT KURALLARI (Sadece JSON üret):
 {
   "summary": {
-    "overallStatus": "Uygun | Kısmen Uygun | Uygun Değil",
-    "riskLevel": "Düşük | Orta | Yüksek",
-    - "summary.note": Eğer takvim boşsa, şu yapıda bir baş denetçi notu yaz:
-      1. Durumu tespit et (Konular var, takvim boş).
-      2. Yasal riski vurgula (6331 Sayılı Kanun, idari para cezası ve iş kazalarında tam kusur riski).
-      3. Denetron'un sunduğu "Önerilen Plan"ın bu riski nasıl bertaraf edeceğini ve planın onaylanması gerektiğini belirt.
-      Dili ciddi, kurumsal ve ikna edici tut.
+    "overallStatus": "string",
+    "riskLevel": "string",
+    "note": "string (TALİMATLARDAKİ YASAL VURGULU VE DETAYLI DENETÇİ NOTU BURAYA GELECEK)"
   },
   "participants": [
     {
-      "name": "Ad Soyad",
-      "status": "Geçerli | Süresi Yaklaşıyor | Süresi Dolmuş | Belirsiz",
-      "evidence": "Eğitim tarihi, belge no veya kayıt referansı (yoksa null)"
+      "name": "string",
+      "status": "string",
+      "evidence": "string"
     }
   ],
   "missingTrainings": [
     {
-      "training": "Eğitim Adı",
-      "reason": "Süresi dolmuş | Eksik | Planlanmamış | Belirsiz",
-      "riskLevel": "Orta | Yüksek (Eksikliğin yasal risk derecesi)",
+      "training": "string",
+      "reason": "string",
+      "riskLevel": "string",
       "relatedPeople": []
     }
   ],
   "suggestedPlan": [
     {
-      "training": "Eğitim Adı",
+      "training": "string",
       "targetGroup": "string",
-      "duration": "Yönetmeliğe uygun minimum süre (Örn: 8 saat)",
-      "period": "Yıllık | 2 Yıllık | 3 Yıllık",
-      "suggestedMonth": "Ocak | Şubat | ...",
-      "note": "Mevzuat veya operasyonel öncelik gerekçesi"
+      "duration": "string",
+      "period": "string",
+      "suggestedMonth": "string",
+      "note": "string"
     }
   ]
 }
-
-SADECE GEÇERLİ JSON ÜRET. Markdown kullanma. Açıklama ekleme.
 `.trim();
-
 
 
     console.log(`[ISG_TRAINING][${requestId}] 6) prompt ready`, {
@@ -528,9 +556,11 @@ SADECE GEÇERLİ JSON ÜRET. Markdown kullanma. Açıklama ekleme.
     /* ===== 9) NORMALIZE / ATTACH META ===== */
     const normalized: TrainingResponse = {
       summary: {
-        overallStatus: parsed.summary?.overallStatus ?? "Kısmen Uygun",
-        riskLevel: parsed.summary?.riskLevel ?? "Orta",
-        note: parsed.summary?.note ?? "Belge analiz edildi. Sonuçlar ön değerlendirmedir.",
+        // AI'dan gelen veriyi öncelikli yap, yoksa fallback değerlerini kullan
+        overallStatus: parsed.summary?.overallStatus || "Kısmen Uygun",
+        riskLevel: parsed.summary?.riskLevel || "Orta",
+        // Profesyonel notu ezen kısmı sildik, AI notu artık doğrudan ekrana gelecek
+        note: parsed.summary?.note || "Analiz tamamlandı, değerlendirme notu hazırlanırken bir hata oluştu.",
       },
       participants: Array.isArray(parsed.participants) ? parsed.participants : [],
       missingTrainings: Array.isArray(parsed.missingTrainings) ? parsed.missingTrainings : [],
