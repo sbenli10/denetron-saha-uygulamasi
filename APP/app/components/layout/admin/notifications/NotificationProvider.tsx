@@ -1,8 +1,9 @@
+//APP\app\components\layout\admin\notifications\NotificationProvider.tsx
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabaseClient } from "@/lib/supabase/client";
-
+import { toast } from "sonner";
 /* ================= TYPES ================= */
 
 export type NotificationItem = {
@@ -75,35 +76,34 @@ export function NotificationProvider({
     load();
   }, [orgId]);
 
-  /* ================= 2) REALTIME ================= */
+ useEffect(() => {
+  if (!orgId) return;
 
-  useEffect(() => {
-    if (!orgId) return; // ✅ BURASI DA Ş encourages
+  const channel = supabase
+    .channel("org-notifications")
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "notifications" },
+      (payload) => {
+        const n = payload.new as NotificationItem;
+        if (n.org_id !== orgId) return;
 
-    const channel = supabase
-      .channel("org-notifications")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-        },
-        (payload) => {
-          const n = payload.new as NotificationItem;
+        setNotifications((prev) => [n, ...prev]);
 
-          if (n.org_id !== orgId) return;
+        // ✅ AKTİF BİLDİRİM: Ekranın köşesinde toast mesajı göster
+        toast.info(n.title, {
+          description: n.message,
+          action: {
+            label: "Görüntüle",
+            onClick: () => open(), // Bildirim panelini açar
+          },
+        });
+      }
+    )
+    .subscribe();
 
-          setNotifications((prev) => [n, ...prev]);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [orgId]);
-
+  return () => { supabase.removeChannel(channel); };
+}, [orgId]);
   /* ================= 3) ACTIONS ================= */
 
   const markAsRead = async (id: number) => {

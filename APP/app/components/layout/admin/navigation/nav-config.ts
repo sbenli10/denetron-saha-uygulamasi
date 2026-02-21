@@ -103,10 +103,6 @@ export const NAV_ITEMS: SidebarNavItem[] = [
     roles: ["admin", "manager"],
     children: [
       {
-        label: "📚 Tüm Raporlar",
-        href: "/admin/reports",
-      },
-      {
         label: "🧩 Şablonlar",
         href: "/admin/templates",
       },

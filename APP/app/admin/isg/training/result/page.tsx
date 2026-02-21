@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
-
+import { toast } from "sonner"; // Bildirim için
 /* ================= TYPES ================= */
 
 type TrainingResult = {
@@ -100,6 +100,92 @@ export default function TrainingResultPage() {
       ? "warning"
       : "success";
 
+const exportToPDF = async () => {
+  if (!result) return;
+
+  try {
+    const { jsPDF } = await import("jspdf");
+    const autoTable = (await import("jspdf-autotable")).default;
+    const doc = new jsPDF();
+
+    // 1. INTER FONTUNU TANIMLA (Özetlenmiş Base64 örneği)
+    // NOT: Buradaki '...' yerine yukarıdaki siteden aldığın o çok uzun string gelmeli.
+    const interRegularBase64 = "AAEAAAARAQA..."; 
+
+    // Fontu sanal dosya sistemine ekle
+    doc.addFileToVFS("Inter-Regular.ttf", interRegularBase64);
+    doc.addFont("Inter-Regular.ttf", "Inter", "normal");
+    
+    // Fontu kullanmaya başla
+    doc.setFont("Inter");
+
+    // 2. TÜRKÇE KARAKTERLER ARTIK SERBEST (fixText'e gerek kalmadı)
+    doc.setFontSize(18);
+    doc.text("İSG Yıllık Eğitim Planı ve Analiz Raporu", 14, 20);
+
+    doc.setFontSize(11);
+    doc.text(`Genel Durum: ${result.summary.overallStatus}`, 14, 30);
+    doc.text(`Risk Seviyesi: ${result.summary.riskLevel}`, 14, 37);
+
+    // 3. TABLO TASARIMI
+    const tableColumn = ["Eğitim Adı", "Hedef Grup", "Süre", "Ay"];
+    const tableRows = result.suggestedPlan.map(p => [
+      p.training,
+      p.targetGroup,
+      p.duration,
+      p.suggestedMonth
+    ]);
+
+    (doc as any).autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 45,
+      theme: 'grid',
+      styles: { 
+        font: "Inter", // ✅ Tablo içinde de Inter kullan
+        fontSize: 10 
+      },
+      headStyles: { fillColor: [79, 70, 229] }
+    });
+
+    doc.save("Denetron_Analiz_Raporu.pdf");
+    toast.success("PDF Inter fontuyla oluşturuldu.");
+  } catch (error) {
+    console.error("PDF Hatası:", error);
+    toast.error("PDF oluşturulurken bir hata oluştu.");
+  }
+};
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  // 📗 EXCEL OLARAK AKTAR
+  const exportToExcel = async () => {
+    if (!result) return;
+
+    try {
+      const XLSX = await import("xlsx");
+      
+      // Veriyi Excel formatına hazırla
+      const worksheet = XLSX.utils.json_to_sheet(result.suggestedPlan.map(p => ({
+        "Eğitim Konusu": p.training,
+        "Hedef Kitle": p.targetGroup,
+        "Süre": p.duration,
+        "Periyot": p.period,
+        "Önerilen Ay": p.suggestedMonth,
+        "Notlar": p.note
+      })));
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Eğitim Planı");
+
+      // Dosyayı indir
+      XLSX.writeFile(workbook, "Denetron_ISG_Egitim_Analizi.xlsx");
+      toast.success("Excel dosyası başarıyla indirildi.");
+    } catch (error) {
+      console.error("Excel Hatası:", error);
+      toast.error("Excel dosyası oluşturulamadı.");
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-10 space-y-10">
 
@@ -188,9 +274,9 @@ export default function TrainingResultPage() {
                 <p className="text-sm text-gray-600 mt-1">
                   Durum: {m.reason}
                 </p>
-                {m.relatedPeople?.length ? (
+                {m.relatedPeople ? (
                   <p className="text-xs text-gray-500 mt-1">
-                    İlgili kişiler: {m.relatedPeople.join(", ")}
+                    İlgili kişiler: {Array.isArray(m.relatedPeople) ? m.relatedPeople.join(", ") : m.relatedPeople}
                   </p>
                 ) : null}
               </div>
@@ -234,25 +320,57 @@ export default function TrainingResultPage() {
 
       {/* ===== AKSİYON BUTONLARI ===== */}
       <section className="flex flex-wrap gap-3 pt-6 border-t">
-        <button className="rounded-lg bg-indigo-600 px-4 py-2 text-white">
+        <button 
+          onClick={exportToPDF}
+          className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 transition"
+        >
           Yıllık Eğitim Planı (PDF)
         </button>
-        <button className="rounded-lg border px-4 py-2">
+        <button 
+          onClick={exportToExcel}
+          className="rounded-lg border px-4 py-2 hover:bg-gray-50 transition"
+        >
           Excel’e Aktar
         </button>
         {/* ===== AKSİYONLAR ===== */}
         
-          {/* Sisteme Alma */}
           <button
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
+            disabled={isSeeding}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-white transition-all duration-200 ${
+              isSeeding 
+                ? "bg-indigo-400 cursor-not-allowed" 
+                : "bg-indigo-600 hover:bg-indigo-700 hover:shadow-lg active:scale-95"
+            }`}
             onClick={async () => {
-              await fetch("/api/admin/isg/analyze/annual-plan/seed-executions", {
+              setIsSeeding(true); // Yükleniyor durumunu başlat
+              const promise = fetch("/api/admin/isg/analyze/annual-plan/seed-executions", {
                 method: "POST",
               });
-              alert("Yıllık eğitim planı sisteme alındı. Aylık görevler oluşturuldu.");
+
+              toast.promise(promise, {
+                loading: 'Plan sisteme aktarılıyor ve görevler oluşturuluyor...',
+                success: () => {
+                  setIsSeeding(false);
+                  return 'Yıllık eğitim planı başarıyla sisteme alındı! 🎉';
+                },
+                error: (err) => {
+                  setIsSeeding(false);
+                  return 'Plan aktarılırken bir hata oluştu. Lütfen tekrar deneyin.';
+                },
+              });
             }}
           >
-            📌 Planı Sisteme Al
+            {isSeeding ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                İşleniyor...
+              </>
+            ) : (
+              <>
+                <span>📌</span>
+                Planı Sisteme Al
+              </>
+            )}
           </button>
 
           {/* Takvim */}

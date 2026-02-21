@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   GraduationCap,
@@ -16,7 +16,6 @@ import {
   Info,
   Loader2,
   RefreshCcw,
-  LucideIcon,
 } from "lucide-react";
 
 /* ---------------- TYPES ---------------- */
@@ -116,13 +115,14 @@ export default function TrainingUploadPage() {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const getFileIcon = (file: File): React.ReactElement => {
-    if (file.type.startsWith("image/")) return <FileImage className="text-indigo-500" />;
-    if (file.type === "application/pdf") return <FileText className="text-red-500" />;
+  // JSX.Element yerine React.ReactNode kullanımı daha güvenlidir
+  const getFileIcon = (file: File): React.ReactNode => {
+    if (file.type.startsWith("image/")) return <FileImage className="text-indigo-500" size={20} />;
+    if (file.type === "application/pdf") return <FileText className="text-red-500" size={20} />;
     if (file.type.includes("spreadsheet") || file.type.includes("excel")) {
-      return <FileSpreadsheet className="text-green-600" />;
+      return <FileSpreadsheet className="text-green-600" size={20} />;
     }
-    return <File className="text-gray-400" />;
+    return <File className="text-gray-400" size={20} />;
   };
 
   const handleAnalyze = async () => {
@@ -149,7 +149,6 @@ export default function TrainingUploadPage() {
 
       const result = await response.json();
 
-      // Browser ortamı kontrolü
       if (typeof window !== "undefined") {
         sessionStorage.setItem("isg_training_result", JSON.stringify(result));
         router.push("/admin/isg/training/result");
@@ -244,7 +243,11 @@ export default function TrainingUploadPage() {
                   type="file"
                   multiple
                   className="hidden"
-                  onChange={(e) => handleFiles(Array.from(e.target.files || []))}
+                  onChange={(e) => {
+                    if (e.target.files) {
+                        handleFiles(Array.from(e.target.files));
+                    }
+                  }}
                 />
               </label>
             </div>

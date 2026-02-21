@@ -177,6 +177,7 @@ export default function LoginPage() {
   const [, setPendingLogin] = useState<{
   role: "admin" | "operator";
   
+  
 } | null>(null);
 async function handleForgotPassword() {
   if (!email) {
@@ -211,7 +212,21 @@ async function handleForgotPassword() {
   }
 }
 
+const [showTour, setShowTour] = useState(false);
+const [tourStep, setTourStep] = useState(1);
 
+// Kullanıcının daha önce görüp görmediğini kontrol et
+useEffect(() => {
+  const hasSeenTour = localStorage.getItem("denetron_tour_seen");
+  if (!hasSeenTour) {
+    setShowTour(true);
+  }
+}, []);
+
+const completeTour = () => {
+  localStorage.setItem("denetron_tour_seen", "true");
+  setShowTour(false);
+};
 
 
 async function handleVerifyOtp(e: FormEvent) {
@@ -402,7 +417,11 @@ return (
           </header>
 
           {/* ================= ROLE SELECTOR ================= */}
-          <div className="mb-8 relative flex rounded-xl bg-white/10 border border-white/10 p-1 backdrop-blur-md">
+          <div className={`mb-8 relative flex rounded-xl bg-white/10 border p-1 backdrop-blur-md transition-all duration-500 ${
+            showTour && tourStep === 1 
+              ? "border-blue-500 ring-4 ring-blue-500/20" 
+              : "border-white/10"
+          }`}>
             <div
               className={`
                 absolute top-1 bottom-1 w-1/2 rounded-lg
@@ -415,7 +434,7 @@ return (
             <button
               type="button"
               onClick={() => setLoginRole("operator")}
-              className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg
+              className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors
                 ${loginRole === "operator" ? "text-black" : "text-white/70 hover:text-white"}
               `}
             >
@@ -424,7 +443,7 @@ return (
             <button
               type="button"
               onClick={() => setLoginRole("owner")}
-              className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg
+              className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors
                 ${loginRole === "owner" ? "text-black" : "text-white/70 hover:text-white"}
               `}
             >
@@ -639,6 +658,66 @@ return (
         </div>
       </div>
     </div>
+
+    {/* ✅ TUR MODAL - TAM İÇERİK */}
+      {showTour && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-slate-900 border border-blue-500/30 p-8 rounded-3xl max-w-sm w-full shadow-2xl relative overflow-hidden">
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-600/20 rounded-full blur-3xl" />
+            
+            <div className="relative z-10 space-y-6">
+              <div className="flex justify-between items-center text-blue-400 text-xs font-bold tracking-widest uppercase">
+                <span>Adım {tourStep}/3</span>
+                <button onClick={completeTour} className="text-white/40 hover:text-white uppercase tracking-tighter">Turu Atla</button>
+              </div>
+
+              {/* ADIM İÇERİKLERİ */}
+              {tourStep === 1 && (
+                <div className="space-y-4 animate-in slide-in-from-bottom-4">
+                  <h3 className="text-xl font-bold text-white">Rolünüzü Seçin</h3>
+                  <p className="text-sm text-white/70 leading-relaxed">
+                    Sisteme giriş yapmadan önce **Operatör** mü yoksa **Uzman** mı olduğunuzu belirleyin.
+                  </p>
+                </div>
+              )}
+              {tourStep === 2 && (
+                <div className="space-y-4 animate-in slide-in-from-bottom-4">
+                  <h3 className="text-xl font-bold text-white">Yönetici Girişi</h3>
+                  <p className="text-sm text-white/70 leading-relaxed">
+                    İSG Uzmanıysanız ve henüz hesabınız yoksa, alttaki **"Kayıt Ol"** bağlantısını kullanarak organizasyonunuzu kurun.
+                  </p>
+                </div>
+              )}
+              {tourStep === 3 && (
+                <div className="space-y-4 animate-in slide-in-from-bottom-4">
+                  <h3 className="text-xl font-bold text-white">Operatör Girişi</h3>
+                  <p className="text-sm text-white/70 leading-relaxed">
+                    Operatörler, sadece uzmanlar tarafından davet edildikten sonra kendilerine iletilen bilgilerle giriş yapabilirler.
+                  </p>
+                </div>
+              )}
+
+              {/* NAVİGASYON BUTONLARI */}
+              <div className="flex gap-3 pt-4">
+                {tourStep > 1 && (
+                  <button 
+                    onClick={() => setTourStep(v => v - 1)}
+                    className="flex-1 py-3 rounded-xl border border-white/10 text-sm text-white hover:bg-white/5 transition"
+                  >
+                    Geri
+                  </button>
+                )}
+                <button 
+                  onClick={() => tourStep === 3 ? completeTour() : setTourStep(v => v + 1)}
+                  className="flex-[2] py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-500 transition shadow-lg shadow-blue-900/20"
+                >
+                  {tourStep === 3 ? "Başlayalım" : "Devam Et"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
   </div>
 );
 }

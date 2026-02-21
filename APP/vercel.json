@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/admin/isg/cron/training-notifications",
-      "schedule": "0 7 1 * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }

@@ -23,7 +23,35 @@ export default function LibraryPage() {
   const [newFolderName, setNewFolderName] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  // APP/app/admin/library/page.tsx
 
+// 1. Seçili dosya ID'lerini tutacak state
+const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+// 2. Seçim mantığı
+const handleToggleSelect = (id: string) => {
+  setSelectedIds(prev => 
+    prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+  );
+};
+
+// 3. Diğer aksiyonlar için fonksiyonlar (Şimdilik log basıyoruz, içlerini doldurabilirsin)
+const handleStar = async (id: string, currentState: boolean) => {
+  console.log("Yıldız durumu değişecek:", id, !currentState);
+};
+
+const handleRenameFile = (file: FileItem) => {
+  const newName = prompt("Yeni dosya adı:", file.name);
+  if (newName) console.log("Dosya adı değişecek:", file.id, newName);
+};
+
+const handleShareFile = (file: FileItem) => {
+  alert(`Paylaşım linki oluşturuluyor: ${file.name}`);
+};
+
+const handleViewHistory = (file: FileItem) => {
+  console.log("Sürüm geçmişi açılıyor:", file.id);
+};
   /* =========================
      FETCH FOLDERS
   ========================= */
@@ -32,6 +60,27 @@ export default function LibraryPage() {
     const data = await res.json();
     setFolders(data.folders || []);
   }
+
+  // APP/app/admin/library/page.tsx
+
+async function deleteFile(fileId: string) {
+  const ok = confirm("Bu dosyayı silmek istediğinize emin misiniz?");
+  if (!ok) return;
+
+  try {
+    const res = await fetch("/api/admin/library/files/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: fileId }),
+    });
+
+    if (res.ok) {
+      await fetchFiles(); // ✅ Listeyi anında güncelle
+    }
+  } catch (error) {
+    console.error("Dosya silme hatası:", error);
+  }
+}
 
   /* =========================
      FETCH FILES
@@ -141,19 +190,30 @@ async function createChildFolder(parentId: string) {
   /* =========================
      UPLOAD FILE
   ========================= */
+
   async function uploadFile(file: File) {
-    const fd = new FormData();
-    fd.append("file", file);
-    if (currentFolder) fd.append("folder_id", currentFolder);
+    setLoading(true); // Yükleme başladığında grid'i yükleniyor durumuna sokar
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      if (currentFolder) fd.append("folder_id", currentFolder);
 
-    await fetch("/api/admin/library/upload", {
-      method: "POST",
-      body: fd,
-    });
+      const res = await fetch("/api/admin/library/upload", {
+        method: "POST",
+        body: fd,
+      });
 
-    await fetchFiles();
+      if (res.ok) {
+        // ✅ KRİTİK: Sayfa yenilenmeden dosyaları tekrar çek
+        await fetchFiles(); 
+        // İsteğe bağlı: Başarılı bildirimi göster
+      }
+    } catch (error) {
+      console.error("Yükleme hatası:", error);
+    } finally {
+      setLoading(false); // İşlem bitince yükleniyor modundan çık
+    }
   }
-
   /* =========================
      RENDER
   ========================= */
@@ -195,13 +255,21 @@ async function createChildFolder(parentId: string) {
             onCreateChild={createChildFolder}
           />
         </aside>
-
         {/* FILE GRID */}
         <main className="lg:col-span-9 bg-white border rounded-xl p-4 min-h-[200px]">
           {loading ? (
-            <p className="text-sm text-gray-400">Yükleniyor…</p>
+            <p className="text-sm text-gray-400 font-medium">Güncelleniyor…</p>
           ) : (
-            <FileGrid files={files} />
+            <FileGrid 
+              files={files} 
+              selectedIds={selectedIds}
+              onSelect={handleToggleSelect}
+              onStar={handleStar}
+              onRename={handleRenameFile}
+              onShare={handleShareFile}
+              onViewHistory={handleViewHistory}
+              onDelete={deleteFile} 
+            />
           )}
         </main>
       </div>
