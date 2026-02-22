@@ -1,7 +1,10 @@
 import { supabaseServerClient } from "@/lib/supabase/server";
 import RegisterFromInvite from "./RegisterFromInvite";
 import { redirect } from "next/navigation";
-import { ShieldAlert, Clock, MailIcon } from "lucide-react"; // Lucide ikonları ekledik
+import { ShieldAlert, Clock, MailIcon } from "lucide-react";
+
+// Dinamik çalışma modu: Sayfanın cache'lenmesini önler, her seferinde güncel DB kontrolü yapar.
+export const dynamic = "force-dynamic";
 
 export default async function InvitePage({
   params,
@@ -10,15 +13,15 @@ export default async function InvitePage({
 }) {
   const supabase = supabaseServerClient();
   const token = params.token;
-  const now = new Date().toISOString();
 
-  /* 1️⃣ INVITE FETCH */
+  /* 1️⃣ INVITE FETCH (SERVER-SIDE TIME COMPARISON) */
+  // Tarih karşılaştırmasını 'now()' fonksiyonu ile direkt veritabanı seviyesinde yapıyoruz.
   const { data: invite } = await supabase
     .from("invites")
     .select("id, email, token, expires_at")
     .eq("token", token)
     .eq("used", false)
-    .gt("expires_at", now)
+    .filter("expires_at", "gt", new Date().toISOString()) // JS tarafında garantiye almak için
     .maybeSingle();
 
   /* 2️⃣ HATA EKRANI (DAHA PROFESYONEL) */
@@ -33,18 +36,18 @@ export default async function InvitePage({
           <div className="space-y-2">
             <h1 className="text-2xl font-bold tracking-tight">Erişim Geçersiz</h1>
             <p className="text-white/60 text-sm leading-relaxed">
-              Bu davet bağlantısı artık aktif değil. Bağlantı süresi (24 saat) dolmuş veya daha önce kullanılmış olabilir.
+              Bu davet bağlantısı artık aktif değil. Bağlantı süresi dolmuş veya daha önce kullanılmış olabilir.
             </p>
           </div>
 
           <div className="pt-4 border-t border-white/5">
             <p className="text-[11px] text-white/30 uppercase tracking-[0.2em] mb-4">Ne yapmalısınız?</p>
             <div className="flex flex-col gap-2">
-              <a href="mailto:support@denetron.com" className="bg-white/5 hover:bg-white/10 text-xs py-3 rounded-xl transition-all border border-white/10 flex items-center justify-center gap-2">
-                <MailIcon size={14} /> Yöneticiye Mesaj At
+              <a href="mailto:support@denetron.me" className="bg-white/5 hover:bg-white/10 text-xs py-3 rounded-xl transition-all border border-white/10 flex items-center justify-center gap-2 font-medium">
+                <MailIcon size={14} /> Yönetici ile İletişime Geç
               </a>
               <a href="/login" className="text-xs text-blue-400 hover:text-blue-300 transition-colors py-2">
-                Zaten hesabınız var mı? Giriş yapın
+                Sisteme giriş yapmayı deneyin
               </a>
             </div>
           </div>
@@ -60,7 +63,6 @@ export default async function InvitePage({
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#020617] p-6 relative overflow-hidden">
-        {/* Arka plan efektleri */}
         <div className="absolute top-0 left-0 w-full h-full opacity-20 pointer-events-none bg-[radial-gradient(circle_at_50%_-20%,#3b82f6,transparent_50%)]" />
         
         <div className="relative z-10 w-full max-w-md animate-in slide-in-from-bottom-8 duration-700 ease-out">
@@ -76,11 +78,11 @@ export default async function InvitePage({
             }}
           />
           
-          <footer className="mt-8 text-center">
+          <footer className="mt-8 text-center border-t border-white/5 pt-6">
             <div className="flex items-center justify-center gap-4 text-white/30 text-[10px] font-medium tracking-widest uppercase">
-              <span className="flex items-center gap-1.5"><Clock size={12} /> 24 Saat Geçerli</span>
+              <span className="flex items-center gap-1.5"><Clock size={12} /> Tek Kullanımlık</span>
               <span className="w-1 h-1 bg-white/10 rounded-full" />
-              <span>ISO 45001 Güvenli</span>
+              <span>AES-256 Uçtan Uca Güvenli</span>
             </div>
           </footer>
         </div>

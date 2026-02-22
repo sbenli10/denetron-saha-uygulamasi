@@ -78,7 +78,9 @@ export async function POST(req: Request) {
 
     /* ---------------- CREATE INVITE ---------------- */
     const token = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    // 24 saat yerine 48 saat veya 7 gün yaparak timezone riskini sıfırlayın
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 48); // 48 saat sonra
 
     const { error: insertError } = await supabase.from("invites").insert({
       email: email.toLowerCase(),
